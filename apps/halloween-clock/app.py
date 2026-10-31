@@ -23,6 +23,7 @@ itself, so the app only sends a request when the minute changes or an event fire
 """
 import argparse
 import base64
+import colorsys
 import json
 import random
 import re
@@ -58,7 +59,7 @@ def base_layers(style, weather, moon):
 
 BATS = ["bat_lr_high.anim", "bat_rl_high.anim", "bat_lr_low.anim", "bat_rl_low.anim"]
 BAT_SECONDS, THUNDER_SECONDS = 3.0, 0.8  # one-shot lengths (frames / 20 fps)
-CHARGE_SECONDS, CHARGE_FPS = 12.0, 10     # a strike turns the clock green; it fades back to orange
+CHARGE_SECONDS, CHARGE_FPS = 24.0, 10     # a strike turns the clock green; it fades back to orange
 
 
 
@@ -125,14 +126,19 @@ def hex_rgb(value):
 
 
 def charge_color(k, orange):
-    """Colour of the charged clock at fraction k (0..1) of the fade: flash, green, back to the clock colour."""
-    if k < 0.03:
-        return (215, 255, 215)
-    if k < 0.15:
-        return (90, 255, 90)
-    u = (k - 0.15) / 0.85
-    u = u * u * (3 - 2 * u)  # smoothstep: lingers green, then eases back
-    return tuple(round(a + (b - a) * u) for a, b in zip((90, 255, 90), orange))
+    """Colour of the charged clock at fraction k (0..1) of the fade: a short flash, a held electric
+    green, then the hue slowly sweeps green -> yellow -> the clock colour (full saturation all the way,
+    so it never goes pale or muddy on the LEDs)."""
+    if k < 0.012:
+        return (170, 255, 190)                      # the flash
+    green = 125 / 360                               # hue of the held green
+    if k < 0.2:
+        return tuple(round(c * 255) for c in colorsys.hsv_to_rgb(green, 1.0, 1.0))
+    h0, s0, v0 = colorsys.rgb_to_hsv(*(c / 255 for c in orange))
+    u = (k - 0.2) / 0.8
+    u = u * u * (3 - 2 * u)                         # smoothstep: starts and ends gently
+    h, sat, val = green + (h0 - green) * u, 1.0 + (s0 - 1.0) * u, 1.0 + (v0 - 1.0) * u
+    return tuple(round(c * 255) for c in colorsys.hsv_to_rgb(h, sat, val))
 
 
 def digit_pixels(base, color):

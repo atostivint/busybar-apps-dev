@@ -13,7 +13,7 @@ BUSY Bar setup (Windows), 2026-10-31
   and for foggy `mist_foggy`; then the time text; then one-shot events (bat, thunder, charge).
   Weather (calm/stormy/foggy) and moon (full/half/crescent/blood) are random at startup and
   every `--reroll` minutes unless fixed with `--weather` / `--moon`. Thunder only in stormy and
-  foggy, plus a strike at every new hour there. A strike turns the clock green and fades it back
+  foggy, plus a strike at every new hour there. A strike turns the clock electric green and sweeps its hue back (24 s)
   to orange: the app reads the digit pixels from `/api/screen`, writes a fade `.anim` shaped like
   them (`charge_*.anim`, git-ignored) and uploads it.
 - Assets are generated: `python tools/gen_halloween.py` (pumpkin/bat, classic style),
