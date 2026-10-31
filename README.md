@@ -69,6 +69,10 @@ Restart the app afterwards, since it uploads the files at startup.
 
 ## Other apps
 
+- `apps/jam-intro`: Stunfest / Octojam jam-stand show: a pool scene with the title and the Stunfest logo,
+  plus plasma, starfield, fire and sparkle effects. Runs on its own (`apps/jam-intro/run-jam-intro.command`),
+  see its README. `tools/jam-loop` pre-renders the title and logo loops into the `.anim` files it plays.
+  The Stunfest and Octojam logos belong to the association 3 Hit Combo (personal / jam use, not commercial).
 - `apps/hello-bar`: minimal starter app.
 
 Each app is a folder under `apps/` with `app.py` (argparse options become dashboard controls) and
