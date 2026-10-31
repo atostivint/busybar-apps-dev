@@ -6,7 +6,11 @@ on their own.
 
 ## Halloween Clock
 
-![Halloween Clock](docs/halloween-clock.gif)
+![Halloween Clock running on a real BUSY Bar](docs/halloween-clock-real.gif)
+
+*The real bar. Below: a stormy night, rendered from the bar's screen, with a bat crossing in front of the time and lightning charging the clock.*
+
+![A stormy night: bat, lightning, charged clock](docs/halloween-clock.gif)
 
 An orange clock over an animated night graveyard (`apps/halloween-clock`):
 
