@@ -49,3 +49,27 @@ BUSY Bar setup (Windows), 2026-10-31
 ## Open item
 
 - The time glow is a blurred haze, not digit-shaped; ask the user if it looks good.
+
+## macOS / USB setup and jam-intro (merged from ~/BusyBar, 2026-10-31)
+
+- Second machine: MacBook, bar plugged in over USB. Over USB the bar is always at
+  `http://10.0.4.20` and needs no token; Wi-Fi needs the HTTP API enabled on the bar and the key in
+  `BUSYBAR_TOKEN` (never on the command line, never committed). The bar documents its own API at
+  `http://10.0.4.20/docs`. If nothing answers: unplug, replug, wait 5 s.
+- `apps/jam-intro` (stunfest/octojam jam stand) is stdlib-only Python. `run-jam-intro.command`
+  (bash) is a launcher around `app.py`; `jam-intro.applescript` builds a double-clickable app
+  (`osacompile -o "$HOME/Jam Intro.app" jam-intro.applescript`).
+- `pool` effect: lettering is drawn pixel by pixel from hand-made fonts (8x11 bold, 5x7 fallback)
+  because downscaling the festival artwork made 72x16 unreadable. The Stunfest logo is traced from
+  `logo-source-stunfest-nb.svg` with a 3 px climb. Wheel / wheel click / start-pause are read from the
+  bar's `/api/status/ws` WebSocket (`Controls`, protobuf `State`; ping it or the bar drops it after ~10 s).
+- Same-name asset re-upload too soon fails because the bar locks an asset while a draw reads it;
+  `Sender` rotates through a few filenames.
+- Pre-rendered loops: `python3 tools/jam-loop/build.py stunfest 6 15` writes
+  `<name>_72x16.anim` (needs Pillow; 1 s cross-fade makes the seam seamless). Copy into
+  `apps/jam-intro/loops/`; `app.py` plays `loops/<title>_72x16.anim` and uploads it once.
+- Firmware 1.2.4 bug seen on macOS: joining Wi-Fi (web UI, `POST /api/wifi/connect`, or phone app)
+  freezes the HTTP API on USB and Wi-Fi (ping still works). Recovery: forget the network on the bar
+  and restart it (Start/Pause + Back, 3 s). Related upstream issues: busy-app/busybar-firmware
+  #1042, #949, #896, #940. Prefer USB for jams.
+- Logos belong to the association 3 Hit Combo (personal / jam use only).
