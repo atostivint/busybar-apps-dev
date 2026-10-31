@@ -15,7 +15,7 @@ BUSY Bar setup (Windows), 2026-10-31
   every `--reroll` minutes unless fixed with `--weather` / `--moon`. Thunder only in stormy and
   foggy, plus a strike at every new hour there. A strike turns the clock electric green and sweeps its hue back (24 s)
   to orange: the app reads the digit pixels from `/api/screen`, writes a fade `.anim` shaped like
-  them (`charge_*.anim`, git-ignored) and uploads it.
+  them (`charge_*.anim`, git-ignored) and uploads it; a second overlay (`glowcharge_*.anim`, between scenery and time) turns the orange glow behind the clock green too, and both flicker with the two bolts.
 - Assets are generated: `python tools/gen_halloween.py` (pumpkin/bat, classic style),
   `python tools/gen_graveyard.py` (everything graveyard, ~2 min; deletes old `graveyard*.anim`).
   Restart the app after regenerating (it uploads the files at startup):

@@ -4,3 +4,4 @@ __pycache__/
 tools/preview/*.png
 tools/preview/*.gif
 apps/halloween-clock/assets/charge_*.anim
+apps/halloween-clock/assets/glowcharge_*.anim

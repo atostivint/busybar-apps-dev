@@ -25,6 +25,7 @@ import argparse
 import base64
 import colorsys
 import json
+import math
 import random
 import re
 import signal
@@ -126,20 +127,40 @@ def hex_rgb(value):
     return tuple(int(value[i:i + 2], 16) for i in (1, 3, 5))
 
 
-def charge_color(k, orange):
-    """Colour of the charged clock at fraction k (0..1) of the fade: a short flash, a held electric
-    green, then the hue slowly sweeps green -> yellow -> the clock colour (full saturation all the way,
-    so it never goes pale or muddy on the LEDs)."""
-    if k < 0.012:
-        return (170, 255, 190)                      # the flash
-    green = 125 / 360                               # hue of the held green
+FLASH, GAP = (170, 255, 190), (0, 110, 12)
+GLOW_C, GLOW_HALF, GLOW_ORANGE = (36.0, 7.9), (15.0, 4.4), (255, 100, 0)   # the haze behind the time (see tools/gen_graveyard.py)
+GLOW_FPS = 2
+
+
+def fade_u(t):
+    """0 while flashing and holding green, then a smoothstep 0..1 sweeping back to the clock colour."""
+    k = t / CHARGE_SECONDS
     if k < 0.2:
-        return tuple(round(c * 255) for c in colorsys.hsv_to_rgb(green, 1.0, 1.0))
+        return 0.0
+    u = min(1.0, (k - 0.2) / 0.8)
+    return u * u * (3 - 2 * u)
+
+
+def charge_color(t, orange):
+    """Colour of the charged clock t seconds after the strike: it flickers with the two bolts (flash,
+    gap, flash), holds an electric green, then the hue slowly sweeps green -> yellow -> the clock
+    colour (full saturation all the way, so it never goes pale or muddy on the LEDs)."""
+    if t < 0.1 or 0.2 <= t < 0.4:
+        return FLASH
+    if t < 0.2:
+        return GAP
+    green = 125 / 360
     h0, s0, v0 = colorsys.rgb_to_hsv(*(c / 255 for c in orange))
-    u = (k - 0.2) / 0.8
-    u = u * u * (3 - 2 * u)                         # smoothstep: starts and ends gently
+    u = fade_u(t)
     h, sat, val = green + (h0 - green) * u, 1.0 + (s0 - 1.0) * u, 1.0 + (v0 - 1.0) * u
     return tuple(round(c * 255) for c in colorsys.hsv_to_rgb(h, sat, val))
+
+
+def glow_level(x, y, f):
+    """Strength (0..~0.24) of the glow behind the time at pixel (x, y), animation frame f (20 fps)."""
+    breathe = 0.5 + 0.5 * math.sin(2 * math.pi * f / 60 - 1.0)
+    dx, dy = max(abs(x - GLOW_C[0]) - GLOW_HALF[0], 0), max(abs(y - GLOW_C[1]) - GLOW_HALF[1], 0)
+    return (0.10 + 0.14 * breathe) * math.exp(-((math.hypot(dx, dy) / 3.4) ** 2))
 
 
 def digit_pixels(base, color):
@@ -164,7 +185,7 @@ def charge_element(base, color, n, pts, start=0.0):
     total = int(CHARGE_SECONDS * CHARGE_FPS)
     frames = []
     for i in range(int(start * total), total):
-        c = charge_color(i / (total - 1), color)
+        c = tuple(round(v / 6) * 6 for v in charge_color(i / CHARGE_FPS, color))  # steps: repeated frames are free
         buf = bytearray(w * h * 4)
         for x, y in pts:
             o = ((y - y0) * w + (x - x0)) * 4
@@ -175,6 +196,35 @@ def charge_element(base, color, n, pts, start=0.0):
     upload(base, name)
     return {"id": "charge", "type": "animation", "path": name, "x": x0, "y": y0, "loop": False,
             "timeout": len(frames) / CHARGE_FPS + 2.0}
+
+
+def glow_element(base, n, start=0.0):
+    """The haze behind the time, charged: same shape and breathing as the orange glow in scenery.anim,
+    but green, sweeping back to orange together with the digits. Drawn between scenery and time."""
+    x0, x1, y0, y1 = 19, 54, 0, 13   # keeps clear of the pumpkin, the tombstones and the grass
+    w, h = x1 - x0 + 1, y1 - y0 + 1
+    pix = [(x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)
+           if max(glow_level(x + 0.5, y + 0.5, f) for f in (0, 30)) > 0.02]
+    total = int(CHARGE_SECONDS * GLOW_FPS)
+    first = int(start * total)
+    frames = []
+    for i in range(first, total):
+        t = i / GLOW_FPS
+        c = tuple(round(v / 8) * 8 for v in charge_color(t, GLOW_ORANGE))
+        boost = 1.0 + 0.8 * (1.0 - fade_u(t))          # brighter while green, so the colour change shows
+        f = (i - first) / GLOW_FPS * 20                  # the breathing restarts with the scene at the redraw
+        buf = bytearray(w * h * 4)
+        for x, y in pix:
+            lvl = glow_level(x + 0.5, y + 0.5, f) * boost
+            o = ((y - y0) * w + (x - x0)) * 4
+            buf[o:o + 4] = bytes((min(255, round(c[2] * lvl)), min(255, round(c[1] * lvl)),
+                                  min(255, round(c[0] * lvl)), 255))
+        frames.append(bytes(buf))
+    name = f"glowcharge_{n % 2}.anim"
+    write_anim(ASSETS / name, frames, w, h, GLOW_FPS)
+    upload(base, name)
+    return {"id": "glowcharge", "type": "animation", "path": name, "x": x0, "y": y0, "loop": False,
+            "timeout": len(frames) / GLOW_FPS + 2.0}
 
 
 def clock_text(now, hour12):
@@ -198,11 +248,13 @@ def main():
         return {"id": "time", "type": "text", "text": text, "font": "extra_large",
                 "color": a.color, "x": 36, "y": 8, "align": "center"}
 
-    def scene_elements(text):
+    def scene_elements(text, glow=None):
         """Every element, bottom to top. A draw replaces what we had; elements sent alone end up
-        behind the others, so events are always sent together with the whole scene."""
-        return [{"id": eid, "type": "animation", "path": f, "x": x, "y": y, "loop": True}
-                for eid, f, x, y in base_layers(a.style, weather, moon)] + [time_element(text)]
+        behind the others, so events are always sent together with the whole scene. The charged
+        glow, when there is one, goes between the scenery and the time."""
+        return ([{"id": eid, "type": "animation", "path": f, "x": x, "y": y, "loop": True}
+                 for eid, f, x, y in base_layers(a.style, weather, moon)]
+                + ([glow] if glow else []) + [time_element(text)])
 
     def send(elements):
         call(base, "/api/display/draw", "POST",
@@ -212,14 +264,18 @@ def main():
     last_full, hour_strike_at, charges = 0.0, None, 0
     charge_pts, charge_start, charge_text = None, 0.0, None   # the clock charged by lightning, fading to orange
 
-    def charge_overlay():
-        """The charge in progress as an element, resumed at its current point; None when over."""
+    def charge_overlay(fresh=False):
+        """The charge in progress (digits and glow elements), resumed at its current point, or from
+        the start for a new strike; None when it is over."""
         nonlocal charges
-        remaining = charge_start + CHARGE_SECONDS - time.monotonic()
+        remaining = CHARGE_SECONDS if fresh else charge_start + CHARGE_SECONDS - time.monotonic()
         if not charge_pts or remaining < 1.0:
             return None
         charges += 1
-        return charge_element(base, hex_rgb(a.color), charges, charge_pts, 1 - remaining / CHARGE_SECONDS)
+        start = 1 - remaining / CHARGE_SECONDS
+        return {"digits": charge_element(base, hex_rgb(a.color), charges, charge_pts, start),
+                "glow": glow_element(base, charges, start)}
+
     next_bat = next_thunder = None
     uploaded, rolled = set(), None   # files already on the bar; when the weather was last rolled
     weather, moon, picked = None, None, False
@@ -277,9 +333,9 @@ def main():
                         # and carry on with the fade where it was.
                         time.sleep(0.4)
                         charge_pts, charge_text = digit_pixels(base, hex_rgb(a.color)), text
-                        el = charge_overlay() if len(charge_pts) >= 20 else None
-                        if el:
-                            send(scene_elements(text) + [el])
+                        ov = charge_overlay() if len(charge_pts) >= 20 else None
+                        if ov:
+                            send(scene_elements(text, ov["glow"]) + [ov["digits"]])
                     base_drawn, shown, last_full = True, text, time.monotonic()
 
                 # Random one-shot events, drawn over the scene (and over the time while they last).
@@ -304,14 +360,20 @@ def main():
                         print(f"{time.strftime('%H:%M:%S')} strike ({weather}), digit pixels: {len(pts)}", flush=True)
                         if len(pts) >= 20:
                             charge_pts, charge_start, charge_text = pts, time.monotonic(), shown
+                        elif charge_pts and charge_text == shown:
+                            charge_start = time.monotonic()   # struck again while still charged: recharge
+                    glow = None
                     if fired:
                         if charge_pts and charge_text == shown:
-                            el = charge_overlay()  # bats and strikes redraw the scene: keep the fade going
-                            if el:
-                                extra.append(el)
+                            # bats and strikes redraw the scene: a new strike starts the fade, a bat
+                            # keeps the running one going
+                            ov = charge_overlay(fresh=strike)
+                            if ov:
+                                extra.append(ov["digits"])
+                                glow = ov["glow"]
                         # Redrawn with the scene so the bat flies in front of the time, a bit of
                         # parallax. The loops restart, which is hardly noticeable.
-                        send(scene_elements(shown) + extra + fired)
+                        send(scene_elements(shown, glow) + extra + fired)
                         last_full = time.monotonic()
             except urllib.error.HTTPError as e:
                 base_drawn = False  # force a full redraw once we get the screen back
