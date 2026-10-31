@@ -1,6 +1,6 @@
 name: Halloween Clock
 author: elekt
-description: Orange time between a flickering jack-o'-lantern and a flapping bat. Sprites are firmware-played .anim files, so only the time costs a request (once a minute).
+description: Orange time over an animated night graveyard with random weather (calm, stormy, foggy), moon phases, bats flying in front of the clock, and lightning that charges the time green. Animations are firmware-played .anim files, so only a redraw per minute or event costs a request.
 tags:
   - clock
   - halloween
