@@ -57,6 +57,7 @@ the app through the manager, which forwards the draws to the bar for you.
     python apps/halloween-clock/app.py --hour12 --color "#00FFAA"        # 12h clock, other colour
     python apps/halloween-clock/app.py --bat-min 10 --bat-max 30         # more bats
     python apps/halloween-clock/app.py --thunder-max 0                   # no thunder
+    python apps/halloween-clock/app.py --night                           # for the lowest bar brightness
     python apps/halloween-clock/app.py --help                            # everything
 
 ### Rebuild the animations
@@ -65,7 +66,17 @@ The `.anim` files in `apps/halloween-clock/assets` are generated (needs Pillow f
 
     python tools/gen_graveyard.py     # sky, moon, scenery, bats, thunder (takes ~2 minutes)
 
+    python tools/gen_night.py         # the hand-drawn pixel-art set used by --night (a few seconds)
+
 Restart the app afterwards, since it uploads the files at startup.
+
+### Night mode (`--night`)
+
+At the lowest bar brightness the firmware renders dim or mixed colours as pale white-blue dots,
+and the faint orange glow behind the time as green dots. `--night` plays `night_*.anim` instead:
+hand-drawn pixel art (tree swaying in the wind, a big jack-o'-lantern, tombstones, moon, opaque
+clouds), fully opaque, a handful of saturated colours, no glow and no mist. The bar reports its
+brightness as `auto`, so the app cannot detect low light: switch the flag on yourself.
 
 ## Other apps
 

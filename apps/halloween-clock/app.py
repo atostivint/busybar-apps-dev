@@ -47,13 +47,17 @@ MOONS = ["full", "half", "crescent", "blood"]
 THUNDER_WEATHER = {"stormy": 1.0, "foggy": 2.0}  # thunder only in these; foggy: rarer (x2 waits)
 
 
-def base_layers(style, weather, moon):
-    """Looping animations, bottom to top: (element id, file, x, y)."""
+def base_layers(style, weather, moon, night=False):
+    """Looping animations, bottom to top: (element id, file, x, y). Night mode (night_*.anim, see
+    tools/gen_night.py) is for the lowest bar brightness: opaque pixels only, no mist."""
     if style == "classic":
         return [("pumpkin", "pumpkin.anim", 0, 0), ("bat", "bat.anim", 56, 0)]
-    layers = [("moon", f"moon_{moon}.anim", 0, 0), ("sky", f"sky_{weather}.anim", 0, 0),
-              ("moonrim", f"moonrim_{moon}.anim", 0, 0), ("scenery", "scenery.anim", 0, 0)]
-    if weather == "foggy":
+    pre = "night_" if night else ""
+    layers = [("moon", f"{pre}moon_{moon}.anim", 0, 0), ("sky", f"{pre}sky_{weather}.anim", 0, 0),
+              ("moonrim", f"{pre}moonrim_{moon}.anim", 0, 0), ("scenery", f"{pre}scenery.anim", 0, 0)]
+    if night:   # the moon sprite has its own outline, so there is no separate rim layer
+        layers = [layers[0], layers[1], layers[3]]
+    if weather == "foggy" and not night:
         layers.append(("mist", "mist_foggy.anim", 0, 0))
     return layers
 
@@ -89,6 +93,8 @@ def args():
     p.add_argument("--thunder-max", type=int, default=120, help="longest wait between thunderstorms (0 = none)")
     p.add_argument("--refresh", type=float, default=0.0,
                    help="extra full redraws every N seconds (0 = off; the scene is redrawn every minute anyway)")
+    p.add_argument("--night", action="store_true",
+                   help="night mode for the lowest bar brightness: opaque pixels, few colours, no glow or mist")
     p.add_argument("--priority", type=int, default=50, help="draw priority 1-100 (default 50)")
     return p.parse_args()
 
@@ -243,18 +249,20 @@ def main():
     base = "http://" + a.host.replace("http://", "").rstrip("/")
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     events_on = a.style == "graveyard"
+    bats = ["night_" + b for b in BATS] if a.night else BATS
+    thunder_file = "night_thunder.anim" if a.night else "thunder.anim"
 
-    def time_element(text):
+    def time_element(text, color=None):
         return {"id": "time", "type": "text", "text": text, "font": "extra_large",
-                "color": a.color, "x": 36, "y": 8, "align": "center"}
+                "color": color or a.color, "x": 36, "y": 8, "align": "center"}
 
-    def scene_elements(text, glow=None):
+    def scene_elements(text, glow=None, color=None):
         """Every element, bottom to top. A draw replaces what we had; elements sent alone end up
         behind the others, so events are always sent together with the whole scene. The charged
         glow, when there is one, goes between the scenery and the time."""
         return ([{"id": eid, "type": "animation", "path": f, "x": x, "y": y, "loop": True}
-                 for eid, f, x, y in base_layers(a.style, weather, moon)]
-                + ([glow] if glow else []) + [time_element(text)])
+                 for eid, f, x, y in base_layers(a.style, weather, moon, a.night)]
+                + ([glow] if glow else []) + [time_element(text, color)])
 
     def send(elements):
         call(base, "/api/display/draw", "POST",
@@ -274,7 +282,7 @@ def main():
         charges += 1
         start = 1 - remaining / CHARGE_SECONDS
         return {"digits": charge_element(base, hex_rgb(a.color), charges, charge_pts, start),
-                "glow": glow_element(base, charges, start)}
+                "glow": None if a.night else glow_element(base, charges, start)}
 
     next_bat = next_thunder = None
     uploaded, rolled = set(), None   # files already on the bar; when the weather was last rolled
@@ -288,9 +296,9 @@ def main():
             moon = random.choice(MOONS) if a.moon == "random" else a.moon
             picked = True
             print(f"weather: {weather}, moon: {moon}", flush=True)
-        files = [f for _, f, _, _ in base_layers(a.style, weather, moon)]
+        files = [f for _, f, _, _ in base_layers(a.style, weather, moon, a.night)]
         if events_on:
-            files += BATS + (["thunder.anim"] if weather in THUNDER_WEATHER else [])
+            files += bats + ([thunder_file] if weather in THUNDER_WEATHER else [])
         for name in files:
             if name not in uploaded:
                 upload(base, name)
@@ -327,12 +335,18 @@ def main():
                     if shown and text.endswith(":00") and weather in THUNDER_WEATHER and events_on:
                         hour_strike_at = time.monotonic() + 1.5  # a new hour: lightning charges the clock
                 if not base_drawn:
-                    send(scene_elements(text))
-                    if charge_pts and charge_start + CHARGE_SECONDS - time.monotonic() > 1.0:
+                    fading = charge_pts and charge_start + CHARGE_SECONDS - time.monotonic() > 1.0
+                    cur = None
+                    if fading:
+                        # The digits are redrawn in the colour the fade has reached, not in orange:
+                        # otherwise they would flash orange until the new overlay is uploaded.
+                        cur = charge_color(time.monotonic() - charge_start, hex_rgb(a.color))
+                    send(scene_elements(text, color="#%02X%02X%02XFF" % cur if cur else None))
+                    if fading:
                         # A fade is still running but the digits changed: read their new shape
                         # and carry on with the fade where it was.
                         time.sleep(0.4)
-                        charge_pts, charge_text = digit_pixels(base, hex_rgb(a.color)), text
+                        charge_pts, charge_text = digit_pixels(base, cur), text
                         ov = charge_overlay() if len(charge_pts) >= 20 else None
                         if ov:
                             send(scene_elements(text, ov["glow"]) + [ov["digits"]])
@@ -343,7 +357,7 @@ def main():
                 if events_on and base_drawn:
                     fired, extra = [], []
                     if next_bat and now >= next_bat:
-                        fired.append({"id": "bat", "type": "animation", "path": random.choice(BATS),
+                        fired.append({"id": "bat", "type": "animation", "path": random.choice(bats),
                                       "x": 0, "y": 0, "loop": False, "timeout": BAT_SECONDS + 2.0})
                         next_bat = schedule(a.bat_min, a.bat_max)
                     strike = False
@@ -354,7 +368,7 @@ def main():
                     if strike:
                         wait = THUNDER_WEATHER[weather]
                         next_thunder = schedule(a.thunder_min * wait, a.thunder_max * wait)
-                        fired.append({"id": "thunder", "type": "animation", "path": "thunder.anim",
+                        fired.append({"id": "thunder", "type": "animation", "path": thunder_file,
                                       "x": 0, "y": 0, "loop": False, "timeout": THUNDER_SECONDS + 1.5})
                         pts = digit_pixels(base, hex_rgb(a.color))  # the strike charges the clock
                         print(f"{time.strftime('%H:%M:%S')} strike ({weather}), digit pixels: {len(pts)}", flush=True)

@@ -17,10 +17,16 @@ BUSY Bar setup (Windows), 2026-10-31
   to orange: the app reads the digit pixels from `/api/screen`, writes a fade `.anim` shaped like
   them (`charge_*.anim`, git-ignored) and uploads it; a second overlay (`glowcharge_*.anim`, between scenery and time) turns the orange glow behind the clock green too, and both flicker with the two bolts.
 - Assets are generated: `python tools/gen_halloween.py` (pumpkin/bat, classic style),
-  `python tools/gen_graveyard.py` (everything graveyard, ~2 min; deletes old `graveyard*.anim`).
+  `python tools/gen_graveyard.py` (everything graveyard, ~2 min; deletes old `graveyard*.anim`),
+  `python tools/gen_night.py` (`night_*.anim` for `--night`, hand-drawn ASCII sprites, seconds).
   Restart the app after regenerating (it uploads the files at startup):
   `POST http://127.0.0.1:8321/api/_manager/apps/halloween-clock/restart`. The app is blank for
   ~20 s while it uploads. App log: `GET /api/_manager/apps/halloween-clock/log`.
+- `--night` (lowest bar brightness): the bar reports brightness as `auto` and has no light sensor,
+  so the app can't detect it; the flag is set by hand (manager variation `args`: `{"--night": true}`).
+  Night art must stay opaque, on `PALETTE`, and >= `MIN_LIT` (dimmer/mixed colours show as white dots).
+  The manager overrides the draw priority with the variation's (default 10); the bar's built-in clock
+  outranks that, so the variation needs priority >50 (80 works).
 - Sky loops are 300 frames = 15 s, which divides 60 s on purpose (see gotcha 5).
 
 ## Gotchas
