@@ -96,11 +96,11 @@ def moon_rim(kind):
     """Thin ring round the whole disc, drawn above the clouds so the shape stays readable
     (for a crescent or half moon it also outlines the dark side)."""
     radius = MOONS[kind][0]
-    col = (205, 70, 45) if kind == "blood" else (214, 212, 190)
+    col = (190, 60, 40) if kind == "blood" else (200, 205, 230)
 
     def shape(x, y, f):
         d = math.hypot(x - MOON_C[0], y - MOON_C[1])
-        return (*col, 215) if abs(d - (radius + 0.4)) <= 0.5 else None
+        return (*col, 70) if abs(d - (radius + 0.4)) <= 0.5 else None
     return shape
 
 
