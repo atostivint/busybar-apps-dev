@@ -52,6 +52,7 @@ def main():
     a = args()
     base = "http://" + a.host.replace("http://", "").rstrip("/")
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    clear(base)  # a hard kill (Windows) skips `finally`; wipe leftovers from a previous run
     try:
         while True:
             try:

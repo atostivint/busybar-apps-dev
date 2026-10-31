@@ -20,11 +20,11 @@ PREVIEW = ROOT / "tools" / "preview"
 SIZE, FPS, SS = 16, 20, 4
 
 
-def rasterise(shape, t):
-    """shape(x, y, t) -> (r, g, b) or None. Returns RGBA bytes, SIZE x SIZE."""
+def rasterise(shape, t, width=SIZE, height=SIZE):
+    """shape(x, y, t) -> (r, g, b) or None. Returns RGBA bytes, width x height."""
     out = bytearray()
-    for py in range(SIZE):
-        for px in range(SIZE):
+    for py in range(height):
+        for px in range(width):
             n, sr, sg, sb = 0, 0, 0, 0
             for sy in range(SS):
                 for sx in range(SS):
