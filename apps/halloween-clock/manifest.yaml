@@ -1,0 +1,7 @@
+name: Halloween Clock
+author: elekt
+description: Orange time between a flickering jack-o'-lantern and a flapping bat. Sprites are firmware-played .anim files, so only the time costs a request (once a minute).
+tags:
+  - clock
+  - halloween
+  - animation
