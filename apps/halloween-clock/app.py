@@ -58,7 +58,8 @@ def base_layers(style, weather, moon):
 
 
 BATS = ["bat_lr_high.anim", "bat_rl_high.anim", "bat_lr_low.anim", "bat_rl_low.anim"]
-BAT_SECONDS, THUNDER_SECONDS = 3.0, 0.8  # one-shot lengths (frames / 20 fps)
+BAT_SECONDS, THUNDER_SECONDS = 3.0, 0.8  # one-shot lengths (frames / 20 fps); element timeouts add
+# headroom because the bar needs a moment to load the file and the timeout would cut the end off
 CHARGE_SECONDS, CHARGE_FPS = 24.0, 10     # a strike turns the clock green; it fades back to orange
 
 
@@ -173,7 +174,7 @@ def charge_element(base, color, n, pts, start=0.0):
     write_anim(ASSETS / name, frames, w, h, CHARGE_FPS)
     upload(base, name)
     return {"id": "charge", "type": "animation", "path": name, "x": x0, "y": y0, "loop": False,
-            "timeout": len(frames) / CHARGE_FPS + 0.4}
+            "timeout": len(frames) / CHARGE_FPS + 2.0}
 
 
 def clock_text(now, hour12):
@@ -287,7 +288,7 @@ def main():
                     fired, extra = [], []
                     if next_bat and now >= next_bat:
                         fired.append({"id": "bat", "type": "animation", "path": random.choice(BATS),
-                                      "x": 0, "y": 0, "loop": False, "timeout": BAT_SECONDS + 0.4})
+                                      "x": 0, "y": 0, "loop": False, "timeout": BAT_SECONDS + 2.0})
                         next_bat = schedule(a.bat_min, a.bat_max)
                     strike = False
                     if hour_strike_at and now >= hour_strike_at:
@@ -298,7 +299,7 @@ def main():
                         wait = THUNDER_WEATHER[weather]
                         next_thunder = schedule(a.thunder_min * wait, a.thunder_max * wait)
                         fired.append({"id": "thunder", "type": "animation", "path": "thunder.anim",
-                                      "x": 0, "y": 0, "loop": False, "timeout": THUNDER_SECONDS + 0.4})
+                                      "x": 0, "y": 0, "loop": False, "timeout": THUNDER_SECONDS + 1.5})
                         pts = digit_pixels(base, hex_rgb(a.color))  # the strike charges the clock
                         print(f"{time.strftime('%H:%M:%S')} strike ({weather}), digit pixels: {len(pts)}", flush=True)
                         if len(pts) >= 20:
