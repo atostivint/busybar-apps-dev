@@ -21,19 +21,21 @@ SIZE, FPS, SS = 16, 20, 4
 
 
 def rasterise(shape, t, width=SIZE, height=SIZE):
-    """shape(x, y, t) -> (r, g, b) or None. Returns RGBA bytes, width x height."""
+    """shape(x, y, t) -> (r, g, b) or (r, g, b, a) or None. Returns RGBA bytes, width x height."""
     out = bytearray()
     for py in range(height):
         for px in range(width):
-            n, sr, sg, sb = 0, 0, 0, 0
+            wsum, sr, sg, sb, sa = 0, 0, 0, 0, 0
             for sy in range(SS):
                 for sx in range(SS):
                     c = shape(px + (sx + 0.5) / SS, py + (sy + 0.5) / SS, t)
                     if c:
-                        n += 1
-                        sr, sg, sb = sr + c[0], sg + c[1], sb + c[2]
-            if n:
-                out.extend((round(sr / n), round(sg / n), round(sb / n), round(255 * n / (SS * SS))))
+                        a = c[3] if len(c) == 4 else 255
+                        wsum += a
+                        sr, sg, sb = sr + c[0] * a, sg + c[1] * a, sb + c[2] * a
+                        sa += a
+            if sa:
+                out.extend((round(sr / wsum), round(sg / wsum), round(sb / wsum), round(sa / (SS * SS))))
             else:
                 out.extend((0, 0, 0, 0))
     return bytes(out)
