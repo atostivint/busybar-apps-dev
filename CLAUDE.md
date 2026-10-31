@@ -8,10 +8,20 @@ BUSY Bar setup (Windows), 2026-10-31
 - This repo = private `atostivint/busybar-apps-dev` (branch `master`), registered in the
   manager's `appsDirs` (use forward slashes). Apps: `hello-bar` (starter),
   `halloween-clock` (styles: `graveyard` default, `classic`).
-- halloween-clock assets are generated: `python tools/gen_halloween.py` (pumpkin/bat),
-  `python tools/gen_graveyard.py` (scene, 4 bat flights, thunder). Restart the app after
-  regenerating, since it uploads the `.anim` files at startup. Random bat/thunder are
-  triggered by the app; the time text is re-sent after each event to stay on top.
+- halloween-clock (graveyard style) is built from stacked `.anim` layers, bottom to top:
+  `moon_<kind>`, `sky_<weather>`, `moonrim_<kind>` (outline above the clouds), `scenery`,
+  and for foggy `mist_foggy`; then the time text; then one-shot events (bat, thunder, charge).
+  Weather (calm/stormy/foggy) and moon (full/half/crescent/blood) are random at startup and
+  every `--reroll` minutes unless fixed with `--weather` / `--moon`. Thunder only in stormy and
+  foggy, plus a strike at every new hour there. A strike turns the clock green and fades it back
+  to orange: the app reads the digit pixels from `/api/screen`, writes a fade `.anim` shaped like
+  them (`charge_*.anim`, git-ignored) and uploads it.
+- Assets are generated: `python tools/gen_halloween.py` (pumpkin/bat, classic style),
+  `python tools/gen_graveyard.py` (everything graveyard, ~2 min; deletes old `graveyard*.anim`).
+  Restart the app after regenerating (it uploads the files at startup):
+  `POST http://127.0.0.1:8321/api/_manager/apps/halloween-clock/restart`. The app is blank for
+  ~20 s while it uploads. App log: `GET /api/_manager/apps/halloween-clock/log`.
+- Sky loops are 300 frames = 15 s, which divides 60 s on purpose (see gotcha 5).
 
 ## Gotchas
 
@@ -19,7 +29,15 @@ BUSY Bar setup (Windows), 2026-10-31
    build with `NPM_CONFIG_USERCONFIG` pointing to an empty file.
 2. On Windows the manager hard-kills apps, so `finally:` never runs; every app must
    `DELETE /api/display/draw?application_name=...` at startup.
-3. A 409 low-priority on draw = another client holds the screen.
+3. A 409 low-priority on draw = another client holds the screen. The manager also 409s a
+   draw from a second `application_name`, so test with the app's own name.
+4. A draw with a single changed element (new time text, new color) makes the bar stop rendering
+   the text once the scene has heavy animations (HTTP 200, digits gone) until every element is
+   drawn again. So the app redraws all elements at every minute change and for every event.
+5. A redraw restarts all looping animations (verified), so keep loops at 60 s / n.
+6. Element z-order = array order within one draw; an element sent alone lands behind the rest.
+   Events are sent together with the whole scene, last, so the bat flies in front of the time.
+7. Big uploads can time out (HTTP 408; sky_foggy / mist are ~200 KB): `upload()` retries.
 
 ## Verification and config
 

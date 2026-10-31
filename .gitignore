@@ -3,3 +3,4 @@ __pycache__/
 .env
 tools/preview/*.png
 tools/preview/*.gif
+apps/halloween-clock/assets/charge_*.anim

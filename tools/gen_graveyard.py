@@ -3,13 +3,16 @@
 
     python tools/gen_graveyard.py
 
-Writes into apps/halloween-clock/assets/:
-  graveyard.anim                        looping base scene: tree, pumpkin, moon, drifting clouds,
-                                        stars, grass and a breathing glow behind the time
+Writes into apps/halloween-clock/assets/ (the app stacks them: moon, sky, scenery, mist):
+  moon_{full,half,crescent,blood}.anim  the moon and its halo (20 frames, static)
+  moonrim_{...}.anim                    thin outline of the moon disc, drawn above the sky
+  sky_{calm,stormy,foggy}.anim          weather: clouds, stars or fog (300 frames = 15 s loop)
+  scenery.anim                          tree, pumpkin, tombstones, grass, glow behind the time (120 frames)
+  mist_foggy.anim                       ground fog drawn in front of the scenery
   bat_{lr,rl}_{high,low}.anim           one-shot bat flights (direction x altitude)
-  thunder.anim                          one-shot lightning: sky flash + bolt from the clouds
+  thunder.anim                          one-shot lightning: sky flash + bolt (stormy and foggy only)
 
-The base scene loops (120 frames = 6 s). The bat and thunder are played by the app
+The bat and thunder are played by the app
 at random times, because a baked loop cannot be random. The middle of the bar
 (x 18..54, rows 3..12) is kept free of scenery; the app draws the time on top.
 Also writes tools/preview/*.gif|png (a 10x LED-style preview, without the time digits).
@@ -20,7 +23,7 @@ from gen_halloween import ASSETS, FPS, PREVIEW, bat, flicker, inside, lerp, rast
 from make_anim import rgba_to_bgra, write_anim
 
 W, H = 72, 16
-SCENE_FRAMES = 120   # 6 s loop; every periodic effect below divides 120
+SCENE_FRAMES = 300   # 15 s loop (slow cloud drift); divides 60 s, see app.py; every periodic effect divides 300
 BAT_FRAMES = 60      # 3 s flight
 THUNDER_FRAMES = 16  # 0.8 s
 
@@ -35,11 +38,14 @@ def seg_dist(x, y, a, b):
 # ---- base scene layers (each returns a colour or None) ---------------------------------
 
 def ground(x, y, f):
-    if y >= 15.1:
-        return (30, 62, 26)
-    if int(y) == 14 and int(x) in (2, 9, 20, 27, 33, 41, 49, 52, 60, 66):
-        return (38, 85, 32)
-    return None
+    """Rolling hills: grass surface at a varying height, with darker earth below."""
+    top = 14.0 + 0.55 * math.sin(x / 5.5 + 0.8) + 0.45 * math.sin(x / 2.3 + 2.0)
+    if y < top:
+        return None
+    if y < top + 1.0:
+        shade = 0.85 + 0.25 * math.sin(x * 1.7)          # uneven blades of grass
+        return scale((38, 88, 34), shade)
+    return scale((24, 44, 22), 0.9 + 0.2 * math.sin(x * 0.9 + y))
 
 
 def tombstones(x, y, f):
@@ -55,37 +61,47 @@ def tombstones(x, y, f):
     return None
 
 
-def moon(x, y, f):
-    if math.hypot(x - 63.6, y - 4.6) <= 4.1 and math.hypot(x - 66.2, y - 3.4) > 3.5:
-        return (225, 215, 150)
-    return None
+# ---- moon (own layer, drawn first so the sky can cover it) -------------------------------------
+
+MOON_C = (63.6, 4.6)
+MOONS = {  # kind -> (disc radius, halo colour, halo strength)
+    "full": (3.7, (130, 150, 210), 0.30),
+    "half": (3.9, (120, 140, 200), 0.24),
+    "crescent": (4.1, (120, 140, 200), 0.22),
+    "blood": (3.7, (170, 40, 30), 0.30),
+}
 
 
-CLOUD = (34, 39, 60)
-CLOUD_RIM = (66, 74, 104)  # edge lit by the moon
+def moon_layer(kind):
+    radius, halo, strength = MOONS[kind]
+
+    def shape(x, y, f):
+        d = math.hypot(x - MOON_C[0], y - MOON_C[1])
+        if d <= radius:
+            if kind == "full":
+                crater = any(math.hypot(x - cx, y - cy) < r for cx, cy, r in ((62.4, 3.6, 0.8), (65.0, 5.8, 0.9), (63.6, 6.4, 0.5)))
+                return (214, 206, 150) if crater else (236, 228, 168)
+            if kind == "half":      # right half lit, with a soft terminator
+                return (232, 224, 160) if x >= MOON_C[0] - 0.2 else (60, 64, 88)
+            if kind == "crescent":
+                return (225, 215, 150) if math.hypot(x - 66.2, y - 3.4) > 3.5 else None
+            lit = 0.8 + 0.2 * max(0.0, (MOON_C[0] - x + MOON_C[1] - y) / 6.0)   # blood moon
+            return scale((190, 42, 26), min(lit, 1.0))
+        level = strength * math.exp(-(((d - radius) / 3.2) ** 2))
+        return (*halo, round(255 * level)) if level > 0.04 else None
+    return shape
 
 
-def cloud_hit(x, y, cx, cy, s=1.0):
-    """Union of three puffs on a flat base; returns a distance-like value < 1 when inside."""
-    best = 9.0
-    for dx, dy, r in ((-2.4, 0.5, 1.9), (0.1, -0.3, 2.4), (2.5, 0.6, 1.8)):
-        d = math.hypot((x - cx - dx * s), (y - cy - dy * s)) / (r * s)
-        best = min(best, d)
-    if abs(x - cx) <= 3.9 * s and cy + 0.4 * s <= y <= cy + 1.9 * s:
-        best = min(best, 0.8)
-    return best
+def moon_rim(kind):
+    """Thin ring round the whole disc, drawn above the clouds so the shape stays readable
+    (for a crescent or half moon it also outlines the dark side)."""
+    radius = MOONS[kind][0]
+    col = (205, 70, 45) if kind == "blood" else (214, 212, 190)
 
-
-def clouds(x, y, f):
-    p = 2 * math.pi * f / SCENE_FRAMES
-    # (centre x, centre y, scale): drift back and forth so the moon is covered and uncovered
-    for cx, cy, s in ((61.0 + 5.0 * math.sin(p), 2.4, 0.62),
-                      (66.5 - 4.0 * math.sin(p + 1.1), 7.0, 0.55),
-                      (57.0 + 2.0 * math.sin(p + 2.4), 0.8, 0.45)):
-        d = cloud_hit(x, y, cx, cy, s)
-        if d <= 1.0:
-            return CLOUD_RIM if d > 0.72 and y < cy + 1.2 * s else CLOUD
-    return None
+    def shape(x, y, f):
+        d = math.hypot(x - MOON_C[0], y - MOON_C[1])
+        return (*col, 215) if abs(d - (radius + 0.4)) <= 0.5 else None
+    return shape
 
 
 def tree(x, y, f):
@@ -116,16 +132,113 @@ def mini_pumpkin(x, y, f):
     return None
 
 
-STARS = [(1, 0, 0), (9, 0, 20), (13, 2, 40), (18, 1, 60), (24, 0, 10), (31, 1, 50), (40, 0, 30),
-         (47, 1, 70), (53, 2, 90), (57, 0, 15), (70, 1, 45), (69, 8, 80), (11, 9, 100), (58, 9, 5)]
+# ---- weather: the sky layer (clouds, stars, fog), drawn above the moon ---------------------------
+
+CLOUD = (34, 39, 60)
+CLOUD_RIM = (66, 74, 104)  # edge lit by the moon
+STORM = (20, 23, 38)
+STORM_RIM = (46, 52, 78)
+
+
+MOON_THROUGH_CLOUD = 120  # cloud alpha (of 255) over the moon: it shows through, like behind thin cloud
+
+
+def cloud_hit(x, y, cx, cy, s=1.0):
+    """Union of three puffs on a flat base; returns a distance-like value < 1 when inside."""
+    best = 9.0
+    for dx, dy, r in ((-2.4, 0.5, 1.9), (0.1, -0.3, 2.4), (2.5, 0.6, 1.8)):
+        d = math.hypot((x - cx - dx * s), (y - cy - dy * s)) / (r * s)
+        best = min(best, d)
+    if abs(x - cx) <= 3.9 * s and cy + 0.4 * s <= y <= cy + 1.9 * s:
+        best = min(best, 0.8)
+    return best
+
+
+def drifting_clouds(specs, col=CLOUD, rim=CLOUD_RIM):
+    """specs: (centre x, centre y, scale, drift amplitude, phase). They sway slowly back and forth."""
+    def shape(x, y, f):
+        p = 2 * math.pi * f / SCENE_FRAMES
+        for cx, cy, s, amp, ph in specs:
+            c = cx + amp * math.sin(p + ph)
+            d = cloud_hit(x, y, c, cy, s)
+            if d <= 1.0:
+                c = rim if d > 0.72 and y < cy + 1.2 * s else col
+                # in front of the moon a cloud is thin: the moon shows through it, dimmed
+                return (*c, MOON_THROUGH_CLOUD) if math.hypot(x - MOON_C[0], y - MOON_C[1]) < 5.0 else c
+        return None
+    return shape
+
+
+def cloud_bank(puffs, col=CLOUD, rim=CLOUD_RIM, shade=0.85):
+    """Low overcast: puffs (centre x, centre y, radius, phase) that shift a little; lit near the moon."""
+    def shape(x, y, f):
+        p = 2 * math.pi * f / SCENE_FRAMES
+        for cx, cy, r, ph in puffs:
+            dx, dy = x - (cx + 1.6 * math.sin(p + ph)), y - (cy + 0.4 * math.sin(2 * p + ph))
+            if math.hypot(dx, dy * 1.5) <= r:
+                near = math.hypot(x - MOON_C[0], y - MOON_C[1])
+                lit = max(0.0, 1.0 - near / 16.0)
+                c = scale(lerp(col, rim, lit if dy < 0 else lit * 0.4), shade)
+                return (*c, MOON_THROUGH_CLOUD) if near < 5.2 else c   # thin cloud in front of the moon
+        return None
+    return shape
+
+
+# the middle of the bar (x 18..54, rows 3..12) stays free: that is where the time is drawn
+BANK_LIGHT = [(-2, 1, 3.4, 0.0), (5, 0, 3.0, 1.2), (12, 1, 3.6, 2.1), (20, 0, 3.2, 3.0), (28, 1, 3.4, 4.0),
+              (36, 0, 3.0, 5.1), (44, 1, 3.6, 0.7), (51, 0, 3.0, 1.9), (57, 1, 3.2, 2.8),
+              (3, 6, 2.4, 3.6), (9, 5, 2.0, 4.6), (57, 7, 2.0, 5.5)]
+BANK_STORM = [(-1, 1, 4.2, 0.0), (6, 0, 4.0, 1.2), (13, 1, 4.4, 2.1), (21, 0, 4.0, 3.0), (29, 1, 4.2, 4.0),
+              (37, 0, 4.0, 5.1), (45, 1, 4.4, 0.7), (52, 0, 4.0, 1.9), (58, 1, 4.2, 2.8), (66, 0, 4.2, 3.9),
+              (72, 1, 4.0, 0.3), (2, 5, 3.4, 3.6), (9, 4, 3.0, 4.6), (15, 6, 2.4, 1.1), (58, 6, 2.8, 5.5),
+              (53, 8, 2.2, 2.2), (70, 8, 2.4, 0.9)]
+
+# A few faint stars in the gaps; a slow, shallow twinkle (one 15 s cycle).
+STARS = [(16, 3, 0), (13, 7, 30), (17, 10, 60), (2, 10, 90), (8, 3, 45), (56, 2, 15), (58, 10, 75),
+         (59, 6, 105), (69, 9, 20), (70, 1, 50), (6, 1, 150), (24, 1, 210), (33, 0, 270), (47, 2, 330)]
 
 
 def stars(x, y, f):
     cx, cy = int(x), int(y)
     for sx, sy, ph in STARS:
         if (sx, sy) == (cx, cy):
-            return scale((165, 185, 255), 0.35 + 0.35 * math.sin(2 * math.pi * (f + ph) / 40))
+            return scale((150, 170, 230), 0.36 + 0.09 * math.sin(2 * math.pi * (f + ph) / SCENE_FRAMES))
     return None
+
+
+def haze(x, y, f):
+    """Foggy sky: a pale veil that thickens toward the ground and drifts slowly."""
+    wave = 0.5 + 0.5 * math.sin(2 * math.pi * (x / 36 - f / SCENE_FRAMES) + y / 3)
+    level = (0.10 + 0.12 * y / 16) * (0.6 + 0.4 * wave)
+    return (92, 104, 132, round(255 * level))
+
+
+def mist(x, y, f):
+    """Foggy ground mist, drawn in front of the scenery: slow drifting banks near the grass."""
+    n = math.sin(2 * math.pi * (x / 18 - f / SCENE_FRAMES))
+    m = math.sin(2 * math.pi * (x / 27 + f / SCENE_FRAMES) + 0.3 + y / 4)
+    base = max(0.0, min(1.0, (y - 7.0) / 8.0)) ** 1.3 * 0.42
+    level = base * (0.55 + 0.25 * n + 0.2 * m)
+    return (150, 160, 184, round(255 * level)) if level > 0.03 else None
+
+
+def stack(*layers):
+    def shape(x, y, f):
+        for layer in layers:
+            c = layer(x, y, f)
+            if c:
+                return c
+        return None
+    return shape
+
+
+MAIN_CLOUDS = [(63.0, 2.6, 1.0, 3.0, 0.0), (65.5, 7.6, 0.9, -2.8, 1.1), (59.5, 0.6, 0.75, 1.5, 2.4)]
+WEATHER = {  # name -> (sky layer, optional mist layer drawn above the scenery, thunder?)
+    "calm": (stack(drifting_clouds([(58.0, 1.4, 0.6, 4.0, 0.0)]), stars), None, False),
+    "stormy": (stack(drifting_clouds([(63.0, 2.6, 1.2, 3.0, 0.0), (65.5, 7.8, 1.0, -2.8, 1.1)], STORM, STORM_RIM),
+                     cloud_bank(BANK_STORM, STORM, STORM_RIM, 1.0)), None, True),
+    "foggy": (stack(drifting_clouds(MAIN_CLOUDS), cloud_bank(BANK_LIGHT), haze), mist, True),
+}
 
 
 # Glow behind the time: soft orange haze peaking behind the digits and fading outward.
@@ -140,15 +253,8 @@ def time_glow(x, y, f):
     return scale((255, 100, 0), level) if level > 0.025 else None
 
 
-SCENE_LAYERS = [tree, mini_pumpkin, tombstones, clouds, moon, ground, stars, time_glow]  # first hit wins
-
-
-def scene(x, y, f):
-    for layer in SCENE_LAYERS:
-        c = layer(x, y, f)
-        if c:
-            return c
-    return None
+SCENERY_FRAMES = 120  # lcm of the tree sway (60), pumpkin flicker (40) and glow breath (60)
+scenery = stack(tree, mini_pumpkin, tombstones, ground, time_glow)
 
 
 # ---- one-shot overlays --------------------------------------------------------------------
@@ -212,27 +318,61 @@ def image(rgba, base=None, cell=10):
     return img
 
 
-def previews(scene_rgba, bat_rgba, thunder_rgba):
-    PREVIEW.mkdir(parents=True, exist_ok=True)
-    frames = [image(r) for r in scene_rgba]
-    frames[0].save(PREVIEW / "graveyard.gif", save_all=True, append_images=frames[1:], duration=1000 // FPS, loop=0)
+def composite(layers, f):
+    """Stack RGBA frames (each layer loops on its own length) into one RGBA frame."""
+    out = bytearray(W * H * 4)
+    for frames in layers:
+        src = frames[f % len(frames)]
+        for i in range(0, len(src), 4):
+            a = src[i + 3]
+            if not a:
+                continue
+            k, oa = a / 255, out[i + 3] / 255
+            na = k + oa * (1 - k)
+            for c in range(3):
+                out[i + c] = round((src[i + c] * k + out[i + c] * oa * (1 - k)) / na)
+            out[i + 3] = round(na * 255)
+    return bytes(out)
+
+
+def previews(layers_by_weather, moons, rims, bat_rgba, thunder_rgba):
     from PIL import Image
-    rows = [image(thunder_rgba[i], scene_rgba[10]) for i in (0, 2, 4, 7)] + \
-           [image(bat_rgba[i], scene_rgba[10]) for i in (8, 30)]
+    PREVIEW.mkdir(parents=True, exist_ok=True)
+    for old in PREVIEW.glob("*"):
+        old.unlink()
+    for weather, layers in layers_by_weather.items():
+        frames = [image(composite(layers, f)) for f in range(0, SCENE_FRAMES, 6)]
+        frames[0].save(PREVIEW / f"{weather}.gif", save_all=True, append_images=frames[1:], duration=300, loop=0)
+        strip = Image.new("RGB", (W * 10, H * 10 * 3))
+        for k, f in enumerate((0, 120, 240)):
+            strip.paste(image(composite(layers, f)), (0, k * H * 10))
+        strip.save(PREVIEW / f"{weather}_strip.png")
+    calm = layers_by_weather["calm"]
+    strip = Image.new("RGB", (W * 10, H * 10 * len(moons)))
+    for k, kind in enumerate(moons):
+        strip.paste(image(composite([moons[kind], calm[1], rims[kind], calm[3]], 0)), (0, k * H * 10))
+    strip.save(PREVIEW / "moons_strip.png")
+    base = composite(layers_by_weather["stormy"], 0)
+    rows = [image(thunder_rgba[i], base) for i in (0, 2, 4, 7)] + [image(bat_rgba[i], base) for i in (8, 30)]
     strip = Image.new("RGB", (W * 10, H * 10 * len(rows)))
     for k, im in enumerate(rows):
         strip.paste(im, (0, k * H * 10))
     strip.save(PREVIEW / "events_strip.png")
-    for i in (0, 30, 60, 90):
-        frames[i].save(PREVIEW / f"graveyard_{i}.png")
 
 
 if __name__ == "__main__":
     ASSETS.mkdir(parents=True, exist_ok=True)
-    scene_rgba = build("graveyard", scene, SCENE_FRAMES)
+    for old in ASSETS.glob("graveyard*.anim"):
+        old.unlink()  # replaced by the stacked layers below
+    moons = {kind: build(f"moon_{kind}", moon_layer(kind), 20) for kind in MOONS}
+    rims = {kind: build(f"moonrim_{kind}", moon_rim(kind), 20) for kind in MOONS}
+    scenery_rgba = build("scenery", scenery, SCENERY_FRAMES)
+    skies = {name: build(f"sky_{name}", sky, SCENE_FRAMES) for name, (sky, _, _) in WEATHER.items()}
+    mist_rgba = build("mist_foggy", WEATHER["foggy"][1], SCENE_FRAMES)
     bats = {}
     for name, direction, low in (("bat_lr_high", 1, False), ("bat_rl_high", -1, False),
                                  ("bat_lr_low", 1, True), ("bat_rl_low", -1, True)):
         bats[name] = build(name, bat_flight(direction, low), BAT_FRAMES)
     thunder_rgba = build("thunder", thunder, THUNDER_FRAMES)
-    previews(scene_rgba, bats["bat_rl_low"], thunder_rgba)
+    stacks = {w: [moons["full"], skies[w], rims["full"], scenery_rgba] + ([mist_rgba] if w == "foggy" else []) for w in skies}
+    previews(stacks, moons, rims, bats["bat_rl_low"], thunder_rgba)
