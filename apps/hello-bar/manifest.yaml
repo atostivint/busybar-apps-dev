@@ -1,0 +1,6 @@
+name: Hello Bar
+author: elekt
+description: Starter app. Shows a scrolling-free text message on the front display, refreshed every second.
+tags:
+  - starter
+  - text
