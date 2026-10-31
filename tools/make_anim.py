@@ -65,12 +65,15 @@ def write_anim(path, frames, width, height, fps, sections=None):
     """Writes an .anim.
 
     frames: list of BGRA8888 byte strings, width*height*4 each (use rgba_to_bgra()).
-    sections: list of (name, first_frame, last_frame); defaults to one "default" section over all frames.
+    sections: extra (name, first_frame, last_frame) sections; the mandatory "default" one over all frames is added for you.
+              Ranges may overlap (a section simply plays from its first frame to its last).
               Play one with {"section": name}; "default" plays the whole file.
     """
     assert 0 < width <= 255 and 0 < height <= 255, "width/height are stored in one byte each"
     assert all(len(f) == width * height * 4 for f in frames), "every frame must be width*height*4 bytes"
-    sections = sections or [("default", 0, len(frames) - 1)]
+    # The firmware (anim_file_load_validate_section_0) requires section 0 to be "default", covering every frame;
+    # a file without it is rejected ("AnimFile Error") even if you only ever play another section.
+    sections = [("default", 0, len(frames) - 1)] + [s for s in (sections or []) if s[0] != "default"]
     starts = {start for _, start, _ in sections}
 
     encoded, offsets, max_mask, max_pixels, previous = [], [], 0, 0, None

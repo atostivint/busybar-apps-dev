@@ -44,6 +44,9 @@ BUSY Bar setup (Windows), 2026-10-31
 6. Element z-order = array order within one draw; an element sent alone lands behind the rest.
    Events are sent together with the whole scene, last, so the bat flies in front of the time.
 7. Big uploads can time out (HTTP 408; sky_foggy / mist are ~200 KB): `upload()` retries.
+8. `tools/make_anim.py` multi-section files must start with a section named `default` covering every frame, or
+   the firmware rejects the whole file (`[AnimFile] Error!`). `write_anim()` now adds it. This app only writes
+   single-section files, so it was never affected. Overlapping sections work (each plays from its start to its end).
 
 ## Verification and config
 
@@ -51,6 +54,15 @@ BUSY Bar setup (Windows), 2026-10-31
   (127.0.0.1:8321); the skill's `templates/screenshot.py` does this.
 - Bar host + token live in the manager's `config.json`, not in the repo.
 - Skill installed: `~/.claude/skills/busybar`.
+
+## On-device port
+
+`atostivint/busybar-halloween-clock` (public; local clone in `Projets/busybar-halloween-clock`) is the same clock as a BUSY Bar
+JavaScript app running on the bar itself. Its `tools/gen_graveyard.py`, `gen_night.py`, `gen_halloween.py` and
+`make_anim.py` are copies of this repo's: a change to the art or the writer has to be made in both. The port adds
+`night auto`, a preset time colour and a resumable lightning charge (precomputed fades, no `/api/screen` readback).
+Running both at once: this manager-run app draws at priority 80 and hides the on-device app (default priority 50);
+disable one of them, or raise the on-device app's `Draw priority` setting above 80.
 
 ## Open item
 
