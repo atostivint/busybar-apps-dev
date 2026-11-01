@@ -91,3 +91,13 @@ disable one of them, or raise the on-device app's `Draw priority` setting above 
   and restart it (Start/Pause + Back, 3 s). Related upstream issues: busy-app/busybar-firmware
   #1042, #949, #896, #940. Prefer USB for jams.
 - Logos belong to the association 3 Hit Combo (personal / jam use only).
+
+## prochain-ter (2026-11-01)
+
+- `apps/prochain-ter` (see its README). Draws at priority 60 in the app; the manager overrides with the
+  variation priority, so set it above the built-in clock (80).
+- Elements persist by id across screens: the app deletes ids the new screen no longer has
+  (`DELETE /api/display/draw` with `element_ids`), otherwise old screens ghost through.
+- Sounds: the bar plays a WAV uploaded as `*.snd` (`/api/assets/upload`, then `/api/audio/play`
+  with `path`); format confirmed by ear, 22.05 kHz 16-bit mono.
+- Bar fonts: `small` is ~6 px/char, so `07:12 RNS` is the longest panel line beside a 10 px platform block.
