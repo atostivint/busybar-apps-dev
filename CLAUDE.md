@@ -101,3 +101,13 @@ disable one of them, or raise the on-device app's `Draw priority` setting above 
 - Sounds: the bar plays a WAV uploaded as `*.snd` (`/api/assets/upload`, then `/api/audio/play`
   with `path`); format confirmed by ear, 22.05 kHz 16-bit mono.
 - Bar fonts: `small` is ~6 px/char, so `07:12 RNS` is the longest panel line beside a 10 px platform block.
+
+## fui-clock (2026-11-01)
+
+- `apps/fui-clock`: 25 FUI-style clock designs (`--design`, `all` cycles). Pure stdlib. The bar can't draw a clock,
+  so each minute is rendered ahead as a 60 s `.anim` (`fui/render.py`), uploaded under alternating filenames
+  and started on the minute. Variation priority must be >50 (80).
+- The wheel switches design, a wheel click cycles the accent colour (alarm design: the warning sign); read from
+  `/api/status/ws` (`fui/controls.py`). `--no-wheel` turns it off. `--alarm-colour` / `--alarm-shape` set the alarm.
+- Preview without the bar: `python -m fui.gallery --out gallery.html` (git-ignored).
+- Unverified on the real bar: wheel events through the manager proxy, the heavy designs (~0.5 MB/min uploads).
