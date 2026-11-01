@@ -14,6 +14,35 @@ THEMES = {
 }
 
 
+# The TER swoosh, rendered from the official vector logo at 26x13 with 6 levels of edge
+# coverage (0 = empty, 6 = solid) and a gentle contrast curve: smooth curves, no ragged edge.
+LOGO = [
+    "00000005000000000000000000", "00000065000000000000000000",
+    "00000460000000000000000000", "00000640023000000000000000",
+    "00006666652000000000000000", "00366663000000000000000000",
+    "56666600000120000000000000", "00366000056546100465000000",
+    "00662000660046001666000000", "00660001620660006456400000",
+    "00663002666300166016610000", "00666666666556650004664133",
+    "00166652056665000000266630",
+]
+LEVELS = 6
+
+
+def _mix(a, b, k):
+    """Blend '#RRGGBBAA' a towards b by k/LEVELS -> '#RRGGBB'."""
+    ca = [int(a[i:i + 2], 16) for i in (1, 3, 5)]
+    cb = [int(b[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#" + "".join(f"{round(x + (y - x) * k / LEVELS):02X}" for x, y in zip(ca, cb))
+
+
+def _logo(i, x, y, bg, fg):
+    """Logo bitmap; edge pixels are blended between the block colour (bg) and the logo colour (fg)."""
+    colors = ["0 c none"] + [f"{k} c {_mix(bg, fg, k)}" for k in range(1, LEVELS + 1)]
+    head = f"! XPM2\n{len(LOGO[0])} {len(LOGO)} {LEVELS + 1} 1\n" + "\n".join(colors) + "\n"
+    data = head + "\n".join(LOGO) + "\n"
+    return {"id": i, "type": "xpmbitmap", "x": x, "y": y, "width": len(LOGO[0]), "height": len(LOGO), "data": data}
+
+
 def _rect(i, x, y, w, h, col):
     return {"id": i, "type": "rectangle", "x": x, "y": y, "width": w, "height": h,
             "fill": "solid", "fill_colors": [col], "border_width": 0}
@@ -35,7 +64,7 @@ def panel(theme, dep, platform="", delay_min=0, cancelled=False):
     if cancelled:
         block, on_block, status, scol = th["bad"], th["on_bad"], "SUPPRIME", None
     elif delay_min > 0:
-        block, on_block, status, scol = th["warn"], th["on_block"], f"RETARD {delay_min}MN", th["warn"]
+        block, on_block, status, scol = th["warn"], th["on_block"], f"+{delay_min} MIN", th["warn"]
     else:
         block, on_block, status, scol = th["block"], th["on_block"], "A L'HEURE", th["sub"]
     els = _base(th)
@@ -52,7 +81,8 @@ def panel(theme, dep, platform="", delay_min=0, cancelled=False):
 def identity(theme, number, destination):
     """TER logo block + train number + destination."""
     th = THEMES[theme]
-    return _base(th) + [_rect("logo", 0, 0, 26, 16, th["block"]), _text("ter", "TER", 1, 3, th["on_block"], "normal"),
+    return _base(th) + [_rect("lb", 0, 0, 26, 16, th["block"]),
+                        _logo("logo", 0, 2, th["block"], th["on_block"]),
                         _text("t", str(number)[:6], 29, 0, th["fg"]), _text("b", destination[:7], 29, 8, th["sub"])]
 
 

@@ -20,7 +20,7 @@ class Board(unittest.TestCase):
                 for e in els:
                     if e["type"] == "text":
                         e["text"].encode("ascii")  # bar fonts have no accents
-                    if e["type"] == "rectangle":
+                    if e["type"] in ("rectangle", "xpmbitmap"):
                         self.assertLessEqual(e["x"] + e["width"], 72)
                         self.assertLessEqual(e["y"] + e["height"], 16)
 
