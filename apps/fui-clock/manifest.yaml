@@ -1,0 +1,8 @@
+name: FUI Clock
+author: elekt
+description: A clock in 25 sci-fi HUD designs (seven-segment, dot matrix, radar dial, binary, ECG, glitch, odometer, world clocks...). Each minute is rendered ahead as a 60 s firmware-played animation, so the seconds move smoothly and the app sends one request a minute. Turn the bar's wheel to switch design (a click changes colour, or the alarm sign), or pick design, accent, alarm colour/shape and 12/24 h from the dashboard; "all" cycles through them.
+tags:
+  - clock
+  - hud
+  - fui
+  - animation

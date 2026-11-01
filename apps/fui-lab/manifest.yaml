@@ -1,0 +1,7 @@
+name: FUI Lab
+author: elekt
+description: Sci-fi HUD designs (scope, gauge, telemetry, scanner, stream, brackets, alert) rendered on the computer as looping .anim files and played by the bar. Every design is tunable from the dashboard - cycles, amplitude, thickness, fade, value, segments, colour, brightness floor, loop length.
+tags:
+  - hud
+  - animation
+  - fui

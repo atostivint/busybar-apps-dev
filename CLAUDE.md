@@ -91,3 +91,26 @@ disable one of them, or raise the on-device app's `Draw priority` setting above 
   and restart it (Start/Pause + Back, 3 s). Related upstream issues: busy-app/busybar-firmware
   #1042, #949, #896, #940. Prefer USB for jams.
 - Logos belong to the association 3 Hit Combo (personal / jam use only).
+
+## prochain-ter (2026-11-01)
+
+- `apps/prochain-ter` (see its README). Draws at priority 60 in the app; the manager overrides with the
+  variation priority, so set it above the built-in clock (80).
+- Elements persist by id across screens: the app deletes ids the new screen no longer has
+  (`DELETE /api/display/draw` with `element_ids`), otherwise old screens ghost through.
+- Sounds: the bar plays a WAV uploaded as `*.snd` (`/api/assets/upload`, then `/api/audio/play`
+  with `path`); format confirmed by ear, 22.05 kHz 16-bit mono.
+- Bar fonts: `small` is ~6 px/char, so `07:12 RNS` is the longest panel line beside a 10 px platform block.
+
+## fui-clock (2026-11-01)
+
+- `apps/fui-clock`: 25 FUI-style clock designs (`--design`, `all` cycles). Pure stdlib. The bar can't draw a clock,
+  so each minute is rendered ahead as a 60 s `.anim` (`fui/render.py`), uploaded under alternating filenames
+  and started on the minute. Variation priority must be >50 (80).
+- The wheel switches design, a wheel click cycles the accent colour (alarm design: the warning sign); read from
+  `/api/status/ws` (`fui/controls.py`). `--no-wheel` turns it off. `--alarm-colour` / `--alarm-shape` set the alarm.
+- Preview without the bar: `python -m fui.gallery --out gallery.html` (git-ignored). `python -m fui.preview` rewrites
+  `preview.gif` (README + library thumbnail; Pillow). While the wheel turns, `Live` streams single frames (~9/s, upload
+  + draw each) on the same frame grid as the minute anim, then hands over to a short clip + the rest of the minute.
+- The bar locks the file it is playing (HTTP 508): never re-upload that name (3 rotating names). Also retry 502.
+- Unverified on the real bar: the heavy designs (~0.5 MB/min uploads).

@@ -1,0 +1,7 @@
+name: Prochain TER
+author: elekt
+description: Next TER from your station to Rennes on the front display, with the time left before you must leave home, delays and cancellations, and a station chime. Only active inside the configured commute windows.
+tags:
+  - transport
+  - train
+  - notification
