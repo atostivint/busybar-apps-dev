@@ -12,8 +12,9 @@ from pathlib import Path
 
 HERE =Path(__file__).resolve().parent
 RATE = 22050
-NOTES = [(261.63, 0.75), (392.00, 0.75), (440.00, 0.35), (329.63, 0.35)]  # C4 G4 A4 E4: long long short short
-GAP = 0.05
+NOTES = [(261.63, 0.44), (392.00, 0.37), (440.00, 0.35), (329.63, 0.39)]  # C4 G4 A4 E4, tuned by ear
+SLOW = 1.6  # 1.0 = the lengths tuned in the browser; bigger = slower
+GAP = 0.02
 
 
 def _square(freq, secs, duty=0.5):
@@ -30,7 +31,7 @@ def _square(freq, secs, duty=0.5):
 def samples(volume=40):
     pcm = []
     for f, d in NOTES:
-        pcm += _square(f, d) + [0.0] * int(RATE * GAP)
+        pcm += _square(f, d * SLOW) + [0.0] * int(RATE * GAP)
     amp = 0.6 * max(0, min(100, volume)) / 100  # volume 0-100 -> chime only, not the bar's master volume
     return [int(x * amp * 32767) for x in pcm]
 
