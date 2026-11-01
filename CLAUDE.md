@@ -109,5 +109,8 @@ disable one of them, or raise the on-device app's `Draw priority` setting above 
   and started on the minute. Variation priority must be >50 (80).
 - The wheel switches design, a wheel click cycles the accent colour (alarm design: the warning sign); read from
   `/api/status/ws` (`fui/controls.py`). `--no-wheel` turns it off. `--alarm-colour` / `--alarm-shape` set the alarm.
-- Preview without the bar: `python -m fui.gallery --out gallery.html` (git-ignored).
-- Unverified on the real bar: wheel events through the manager proxy, the heavy designs (~0.5 MB/min uploads).
+- Preview without the bar: `python -m fui.gallery --out gallery.html` (git-ignored). `python -m fui.preview` rewrites
+  `preview.gif` (README + library thumbnail; Pillow). While the wheel turns, `Live` streams single frames (~9/s, upload
+  + draw each) on the same frame grid as the minute anim, then hands over to a short clip + the rest of the minute.
+- The bar locks the file it is playing (HTTP 508): never re-upload that name (3 rotating names). Also retry 502.
+- Unverified on the real bar: the heavy designs (~0.5 MB/min uploads).

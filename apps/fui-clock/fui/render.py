@@ -68,5 +68,17 @@ def render_minute(design, E, fps, acc, hour12, blink, zones, min_alpha, alarm=(R
     return out
 
 
+def render_at(design, now, fps, acc, hour12, blink, zones, min_alpha, alarm=(RED, "triangle")):
+    """The one frame the minute animation shows at epoch `now` (same frame grid as render_minute, so a live
+    frame and the pre-rendered animation agree pixel for pixel)."""
+    E = int(now // 60) * 60
+    i = min(int((now - E) * fps), FRAME_S * fps - 1)
+    canvas = Canvas(min_alpha)
+    x = make_ctx(E, i / fps, acc, hour12, blink, zones, alarm)
+    x.prev = None
+    DESIGNS[design][0](canvas, x)
+    return canvas.rgba()
+
+
 def write(path, frames, fps):
     write_anim(path, [rgba_to_bgra(f) for f in frames], W, H, fps)
