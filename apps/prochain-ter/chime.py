@@ -57,3 +57,10 @@ def play(base, app, remote, timeout=5):
                                  data=json.dumps({"application_name": app, "path": remote}).encode(),
                                  headers={"Content-Type": "application/json"})
     return urllib.request.urlopen(req, timeout=timeout).read()
+
+
+def stop(base, app, timeout=5):
+    """Stop whatever sound is playing."""
+    req = urllib.request.Request(f"{base}/api/audio/play?" + urllib.parse.urlencode({"application_name": app}),
+                                 method="DELETE")
+    return urllib.request.urlopen(req, timeout=timeout).read()

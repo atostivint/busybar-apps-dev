@@ -1,9 +1,18 @@
-"""Pure logic: merge real-time into the timetable, commute windows, leave-by, alerts.
+"""Pure logic: merge real-time into the timetable, commute windows, phases, alerts.
 
 No network, no clock of its own: everything takes `now` so it can be tested.
+
+For a train that leaves at D (real departure, delay included):
+    go      = D - car_min        you must be in the car (drive + parking + walk)
+    prepare = go - prep_min      time to start getting ready
+Phases: wait (before prepare) -> prep (getting ready) -> go (leave now, GRACE_MIN of slack)
+-> late (too late for this train, take the next one).
 """
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+
+GRACE_MIN = 2  # minutes after `go` during which leaving can still work
 
 
 @dataclass
@@ -55,32 +64,71 @@ def merge(scheduled, rt, origin, tz):
     return out
 
 
-def leave_by(dep, buffer_min):
-    return dep["real_dep"] - timedelta(minutes=buffer_min)
-
-
-def pick(deps, now, buffer_min):
-    """-> (target, backup, missed). First running train you can still catch, then the next one."""
-    ok = [d for d in deps if not d["cancelled"] and leave_by(d, buffer_min) >= now]
-    missed = [d for d in deps if not d["cancelled"] and d["real_dep"] > now > leave_by(d, buffer_min)]
-    return (ok[0] if ok else None), (ok[1] if len(ok) > 1 else None), (missed[-1] if missed else None)
+def times(dep, prep_min, car_min):
+    """-> (prepare_at, go_at) for a departure."""
+    go = dep["real_dep"] - timedelta(minutes=car_min)
+    return go - timedelta(minutes=prep_min), go
 
 
 def minutes_until(when, now):
-    return int((when - now).total_seconds() // 60)
+    """Whole minutes left, rounded up (4 min 10 s shows 5), never negative."""
+    return max(0, math.ceil((when - now).total_seconds() / 60))
 
 
-THRESHOLDS = (15, 5, 0)  # minutes before leave-by
+def phase(dep, now, prep_min, car_min):
+    """-> ("wait" | "prep" | "go" | "late", minutes to the next milestone)."""
+    prepare_at, go_at = times(dep, prep_min, car_min)
+    if now < prepare_at:
+        return "wait", minutes_until(prepare_at, now)
+    if now < go_at:
+        return "prep", minutes_until(go_at, now)
+    if now <= go_at + timedelta(minutes=GRACE_MIN):
+        return "go", 0
+    return "late", 0
+
+
+def progress(dep, now, prep_min, car_min):
+    """-> (phase, seconds left in it, bar fill 0..1) for a countdown bar that drains.
+
+    wait: time until you start getting ready (bar scale 30 min); prep: time until you must be in
+    the car (scale = the prep time); go: slack left before it is too late (scale = GRACE_MIN)."""
+    prepare_at, go_at = times(dep, prep_min, car_min)
+    end = go_at + timedelta(minutes=GRACE_MIN)
+    if now < prepare_at:
+        left = (prepare_at - now).total_seconds()
+        return "wait", left, min(1.0, left / 1800)
+    if now < go_at:
+        left = (go_at - now).total_seconds()
+        return "prep", left, min(1.0, left / max(1.0, (go_at - prepare_at).total_seconds()))
+    if now <= end:
+        left = (end - now).total_seconds()
+        return "go", left, min(1.0, left / (GRACE_MIN * 60))
+    return "late", 0.0, 0.0
+
+
+def pick(deps, now, prep_min, car_min):
+    """-> (target, backup, missed). Target = first running train you can still catch,
+    missed = the latest train it is too late for but that has not left yet."""
+    ok, missed = [], []
+    for d in deps:
+        if d["cancelled"]:
+            continue
+        if phase(d, now, prep_min, car_min)[0] != "late":
+            ok.append(d)
+        elif d["real_dep"] > now:
+            missed.append(d)
+    return (ok[0] if ok else None), (ok[1] if len(ok) > 1 else None), (missed[-1] if missed else None)
 
 
 class Alerts:
-    """Fire each threshold once per train; re-alert when a delay changes by >= 3 min or on cancel."""
+    """One chime when it is time to prepare, one when it is time to go; plus a delay change of
+    >= 3 min and a cancellation. Each fires once per train."""
 
     def __init__(self):
         self.fired = set()
         self.last = {}  # train key -> (delay_min, cancelled)
 
-    def check(self, target, now, buffer_min, cancelled_seen=()):
+    def check(self, target, now, prep_min, car_min, cancelled_seen=()):
         events = []
         for c in cancelled_seen:
             key = (c["number"], c["date"])
@@ -96,12 +144,11 @@ class Alerts:
             self.last[key] = (target["delay_min"], False)
         elif prev is None:
             self.last[key] = (target["delay_min"], False)
-        left = minutes_until(leave_by(target, buffer_min), now)
-        for th in sorted(THRESHOLDS):  # the tightest threshold already crossed wins
-            if left <= th and (key, th) not in self.fired:
-                for lower in THRESHOLDS:  # a late start must not replay the earlier chimes
-                    if lower >= th:
-                        self.fired.add((key, lower))
-                events.append((f"t{th}", target))
-                break
+        ph = phase(target, now, prep_min, car_min)[0]
+        if ph == "go" and (key, "go") not in self.fired:
+            self.fired |= {(key, "prepare"), (key, "go")}
+            events.append(("go", target))
+        elif ph == "prep" and (key, "prepare") not in self.fired:
+            self.fired.add((key, "prepare"))
+            events.append(("prepare", target))
         return events
