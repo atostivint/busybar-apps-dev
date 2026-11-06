@@ -41,4 +41,47 @@ time you must start the car, delays/cancellations, and a four-note chiptune chim
   every chime, the missed screen) in about 2.5 minutes; see `sim.py`. `--sim-speed` changes the speed.
 - Tests: `python -m unittest test_core test_board` from this folder.
 
+## Home Assistant as the data source
+
+With `HA_URL` and `HA_TOKEN` both set, the app reads the train from Home Assistant instead of
+recomputing it from GTFS / GTFS-RT. Otherwise (or when HA is down) it uses the GTFS path above, unchanged.
+
+- Env vars: `HA_URL` (e.g. `http://homeassistant.local:8123`) and `HA_TOKEN` (a long-lived access token).
+  `--ha-url` / `--ha-token` override them; prefer the variables, flags show in the process list.
+  Nothing is stored in a file. Polled every 15 s, 5 s timeout, one retry on a network error.
+- Entities read (`GET /api/states/<id>`):
+
+  | entity | what the app uses |
+  |---|---|
+  | `sensor.ter_prochain_train` | state = minutes to departure or `off`; attributes `train`, `trip_id` |
+  | `sensor.ter_phase` | `wait`, `annonce`, `prepare`, `go`, `late`, `off` |
+  | `sensor.ter_heure_de_depart` | timestamp of the departure (delay already included) |
+  | `sensor.ter_heure_de_depart_de_la_maison` | timestamp you leave home; attributes `drive_minutes`, `station_minutes`, `walk_minutes`, `total_minutes` |
+  | `sensor.ter_heure_de_preparation` | timestamp you start getting ready |
+
+- Mapping: the departure becomes the usual one-train list, with prepare-to-leave and leave-to-departure
+  durations taken from the timestamps (`--prep-min`, `--drive-min`, `--parking-min` are ignored).
+  `annonce` shows as `wait`, `prepare` as `prep`. The screens still step through phases from those
+  timestamps every second, so the phase on the bar can differ from `sensor.ter_phase` by the `--slack-min` margin.
+- Fallback: HA unreachable, token rejected (401) or an unexpected payload -> that cycle uses GTFS and a
+  line is logged once. `off` is not a failure: it means no train, and the bar stays blank.
+  HA carries no cancellation flag, so the red cancelled screen only exists on the GTFS path.
+- Direction from location (`sensor.ter_lieu`; state `maison`, `bureau`, `gare_rennes`, `gare_caulnes`,
+  `ailleurs`, `zone`, `inconnu`; attributes `age_minutes`, `stale`, `source_state`, `activity`):
+  `bureau` / `gare_rennes` = return trip (Rennes -> station), `maison` / `gare_caulnes` = outbound, but only
+  when `stale` is explicitly false. Anything else (other places, stale, missing entity) leaves the
+  `--morning` / `--evening` clock windows in charge, exactly as without HA. A trusted location also keeps the
+  app active outside those windows (return trip at the office at 21:00, outbound at home at 11:00); the log
+  says so once ("location keeps the app awake ...") and once more when it stops. Outside the windows the
+  board comes from GTFS, since HA's sensor serves no window then. `--demo` / `--simulate` ignore all this.
+  `sensor.ter_prochain_train` follows HA's own clock window, so when the location disagrees with the window
+  (15:00 and you are at the office) that direction's board comes from GTFS; HA stays the source when they agree.
+- Check it from this folder: `HA_URL=... HA_TOKEN=... python ha.py` prints the parsed state.
+
+```
+export HA_URL=http://homeassistant.local:8123
+export HA_TOKEN=...            # never commit it
+python app.py --demo           # log: "data source: Home Assistant"
+```
+
 Not done: Rennes bus/metro leg, replacement buses, Navitia as an extra source.

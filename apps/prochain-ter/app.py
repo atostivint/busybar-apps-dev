@@ -28,6 +28,7 @@ import chime
 import core
 import engine
 import gtfs
+import ha
 import rt
 import sim
 import traffic
@@ -36,6 +37,7 @@ APP = "prochain-ter"
 TZ = ZoneInfo("Europe/Paris")
 HERE = Path(__file__).resolve().parent
 ALERT_LED = "#FFAA00FF"
+HA_REFRESH_S = 15  # seconds between Home Assistant polls (phases are recomputed every loop from its timestamps)
 
 
 def args():
@@ -66,6 +68,9 @@ def args():
     p.add_argument("--demo", action="store_true", help="ignore the windows (always active)")
     p.add_argument("--simulate", action="store_true", help="play a fake train on a fast clock (see sim.py)")
     p.add_argument("--sim-speed", type=int, default=20, help="simulation: simulated seconds per real second")
+    # no default shown here on purpose: the values come from HA_URL / HA_TOKEN and must not leak into --help
+    p.add_argument("--ha-url", default=None, help="Home Assistant URL (default: $HA_URL). With a token, HA replaces GTFS")
+    p.add_argument("--ha-token", default=None, help="HA long-lived token (default: $HA_TOKEN; prefer the variable)")
     return p.parse_args()
 
 
@@ -226,6 +231,9 @@ def main():
     print(f"{a.station}: prepare {a.prep_min} min, then {car_min} min to the platform (drive {drive})", flush=True)
 
     table, table_day, feed, feed_at = None, None, {}, 0.0
+    ha_cfg = ha.config(a.ha_url, a.ha_token)  # both set -> Home Assistant, else GTFS
+    ha_state, ha_loc, ha_at, ha_down, last_dir, awake_by_location = None, None, 0.0, False, None, False
+    print("data source: " + ("Home Assistant" if ha_cfg else "GTFS (HA_URL / HA_TOKEN not both set)"), flush=True)
     alerts = core.Alerts()
     clock = sim.Clock(a.sim_speed, TZ) if a.simulate else None
     key = traffic.load_key()
@@ -247,20 +255,46 @@ def main():
             now = clock.now() if clock else datetime.now(TZ)
             if clock and clock.done():
                 break
+            if ha_cfg and not clock and time.time() - ha_at >= HA_REFRESH_S:
+                ha_state, ha_loc, ha_at = ha.fetch(*ha_cfg, TZ), ha.location(*ha_cfg), time.time()
+                if ha_state is None and not ha_down:
+                    print("home assistant unusable, falling back to GTFS", file=sys.stderr, flush=True)
+                ha_down = ha_state is None
+            # clock windows first; outside them only a fresh, known location keeps the app awake
             win = core.Window("demo", frozenset(range(7)), 0, 1440, "out") if (a.demo or clock) \
-                else core.active_window(now, windows)
+                else ha.active_window(now, windows, ha_loc if ha_cfg else None)
+            by_location = win is not None and win.name == "location"
+            if by_location != awake_by_location:
+                awake_by_location = by_location
+                if by_location:
+                    print(f"location keeps the app awake outside the clock windows: {ha_loc['place']}, fix "
+                          f"{ha_loc['age_minutes']} min old, {win.direction}", flush=True)
+                else:
+                    print("location no longer keeps the app awake (stale, unknown or not a known place)", flush=True)
             if win is None:
                 if not cleared:
                     clear(base)
                     cleared, shown, shown_ids = True, None, set()
-                time.sleep(30)
+                time.sleep(HA_REFRESH_S if ha_cfg else 30)  # with HA the location is polled while idle
                 continue
+            ha_deps = None  # Home Assistant is the source when configured; GTFS stays the fallback
+            direction = win.direction  # the clock window, unless a trustworthy location says otherwise
+            if ha_cfg and not clock:
+                direction = ha.resolve_direction(ha_loc, win.direction)
+                if direction != last_dir:
+                    print(f"direction: {direction} (clock window: {win.direction}, place: "
+                          f"{(ha_loc or {}).get('place')}, stale: {(ha_loc or {}).get('stale')})", flush=True)
+                    last_dir = direction
+                # HA's board follows HA's own clock window: when the location says the other way, use GTFS
+                # (outside the clock windows HA's sensor serves no window either: GTFS too)
+                if ha_state is not None and direction == win.direction and not by_location:
+                    ha_deps = ha.departures(ha_state)
             try:
-                if clock:
+                if clock or ha_deps is not None:
                     pass
                 elif table is None or table_day != now.date():
                     table, table_day = gtfs.Timetable(), now.date()
-                if not clock and time.time() - feed_at >= a.refresh:
+                if not clock and ha_deps is None and time.time() - feed_at >= a.refresh:
                     feed, feed_at = rt.fetch(), time.time()
             except Exception as e:
                 feed_at = time.time() - a.refresh + 15  # retry soon, keep the last feed
@@ -269,10 +303,14 @@ def main():
                     time.sleep(15)
                     continue
 
-            out = win.direction == "out"
+            out = direction == "out"
             origin, dest = (uic_home, uic_rns) if out else (uic_rns, uic_home)
             prep_min, car = (a.prep_min, car_min) if out else (0, a.work_min)  # evening: no prep, just the way
-            if clock:
+            if ha_deps is not None:  # HA already knows your leave-home and prepare times: use its
+                if ha_state.get("active"):
+                    prep_min, car = ha.timings(ha_state)
+                deps = ha_deps
+            elif clock:
                 deps = sim.departures(clock)
             else:
                 sched = table.between(origin, dest, now.date(), TZ)
