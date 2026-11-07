@@ -140,16 +140,19 @@ def _frames(path):
         return 1
 
 
-def load(folder, limit=0, size=TARGET):
+def load(folder, limit=0, size=TARGET, names=None):
     """Every usable badge in `folder`, one per button.
 
     The collection ships some buttons twice (`firefox.gif` and `firefox.png`): same button, another
     file type, so showing both just repeats it. One file per stem is kept, preferring an animated GIF
     (it still shows its first frame here, but it is the richer original), then a PNG, then anything
-    else. Returned in filename order; the app shuffles the order itself.
+    else. Returned in filename order; the app shuffles the order itself. `names`, when given, limits
+    the scan to those file names (the files a site check has just added).
     """
     by_stem = {}
     for f in sorted(Path(folder).iterdir()):
+        if names is not None and f.name not in names:
+            continue
         if f.suffix.lower() in (".gif", ".png", ".jpg", ".jpeg", ".bmp", ".webp"):
             by_stem.setdefault(f.stem, []).append(f)
 

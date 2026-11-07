@@ -11,7 +11,6 @@ site's index (`buttons-data.js`) and downloads it every time, so it can take a w
 meant for filling the cache on purpose.
 """
 import argparse
-import re
 import sys
 from pathlib import Path
 
@@ -30,8 +29,7 @@ def main():
     a = p.parse_args()
 
     if a.all:
-        js = source._get(f"{source.SITE}/buttons-data.js", 30).decode("utf-8", "replace")
-        wanted = sorted(set(re.findall(r'"([^"]+)"', js)))
+        wanted = source.site_index(30)
     else:
         names = Path(a.list) if a.list else HERE / "assets" / "buttons.txt"
         wanted = source.names(names)

@@ -15,12 +15,14 @@ One whole classic 80×15 web button at a time (`apps/stb-clock`), from the
 cut. The time is drawn transparently on the artwork: black or white 3×5 digits, chosen per button, in
 the corner where they read best and cover the least.
 
-- **No button image lives in this repository.** `assets/buttons.txt` lists the 85 wanted file names;
+- **No button image lives in this repository.** `assets/buttons.txt` lists the 85 seed file names;
   the first start downloads the missing ones into `cache/buttons/` (git-ignored), which then works
-  offline. Delete the folder to fetch everything again.
+  offline. Delete the folder to fetch everything again. The app also reads the collection's index at
+  startup and every 6 hours and adds the buttons that appeared since the last check, so new entries
+  join the rotation on their own.
 - The 80 px button does not fit the 72 px screen, and scaling smears its 1 px glyph strokes, so the 8
   columns with the least horizontal contrast (background, padding, gaps between letters) are deleted:
-  every displayed pixel is an original pixel. 85 buttons, shuffled at every start.
+  every displayed pixel is an original pixel. 85 buttons to start with, shuffled at every start.
 - **Turn the wheel** to step through them, click it to go one forward; the auto swap waits a full
   `--hold` after a manual pick.
 - The clock picks its corner and alignment per button (readable first, then the emptiest spot, flush

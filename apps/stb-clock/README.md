@@ -5,12 +5,18 @@ on top of it. Every `--hold` seconds the button is swapped for the next one with
 sliding, no fading, no animation.
 
 The buttons come from the [Steal These Buttons](https://taylor.fyi/buttons/) collection. **No button
-image is stored in this repository**: `assets/buttons.txt` lists the 85 wanted file names, and on the
+image is stored in this repository**: `assets/buttons.txt` lists the 85 seed file names, and on the
 first start the app downloads the missing ones into `cache/buttons/` (git-ignored). The cache is kept
 between runs and works offline; delete the folder to fetch everything again. The first start
 therefore takes a few seconds longer (85 downloads, about 80 KB). Some buttons exist twice
 as `name.gif` and `name.png`; only one file per button is used (animated GIF > GIF > PNG), and the
 order is shuffled at every start.
+
+The app also **follows the collection**: at startup and every `--follow-every` hours it reads the
+site's index (`buttons-data.js`) and downloads the buttons that appeared since the previous check, so
+a new entry joins the rotation on its own. The first check only records a baseline - the collection
+already lists 4,535 of them, and "new" does not mean "all of them". The list it has picked up lives in
+`cache/wanted.txt` next to the images, never in the repository.
 
 ## The frame
 
@@ -25,7 +31,7 @@ order is shuffled at every start.
 - **It goes where it can be read**: `--clock auto` (the default) rejects corners where more than 5 %
   of the digits would be hard to see, then takes the emptiest of the rest (edge energy: flat
   background ~0, text and logos high). A 15 % busyness nudge keeps it moving from button to button
-  instead of parking on the same empty spot for 60 of the 85 buttons. `--clock bottom-left` (etc.)
+  instead of parking on the same empty spot for 60 of the 85 seed buttons. `--clock bottom-left` (etc.)
   pins one corner.
 - **Flush against the border**: `choose_align()` pushes the time outward so the digits touch the
   button's frame (the halo is clipped on that side). If that would put more than 5 % of the digits
@@ -62,6 +68,8 @@ step through the buttons, click it to go one forward. `--wheel off` ignores it.
 | `--clock-color` | `auto` | digit colour: `auto` black/white, or `inverse` of the button under the digits |
 | `--clock-style` | `filled` | `filled` digits, or `outline` (hollow: only the halo is painted, the artwork shows inside the strokes; black halo only - white falls back to filled) |
 | `--shuffle` | `on` | shuffle the order at start (`off` keeps filename order) |
+| `--follow` | `on` | add the buttons that appeared on the site (`off` only uses the seed list) |
+| `--follow-every` | 6 | hours between site checks (`0` = startup only) |
 | `--start` | 0 | badge index to start on (with `--shuffle off`) |
 | `--priority` | 60 | display priority 1-100 (the manager's variation priority overrides it) |
 | `--host` | `10.0.4.20` | bar address; the manager passes its own |
@@ -86,6 +94,12 @@ of it: an element stays on screen until its id is overwritten or cleared.
 
 `source.py` does the caching: `ensure()` downloads only what is missing, logs a line every 20 files
 and skips a failed download instead of failing the app (the cache then serves what it has).
+`follow()` keeps the collection current: `cache/index.txt` holds the site's index as of the last
+check, so the names missing from it are the new ones; they are downloaded, loaded and appended to the
+live rotation without a restart. The merged wanted list is `cache/wanted.txt`, so an image deleted
+from the cache is fetched again on the next start even after it has left the site's "new" set. A
+failed check (offline, or an index that suddenly shrinks to a handful of names) is logged and skipped;
+the rotation simply stays as it is.
 
 At startup the app deletes its own elements (`DELETE /api/display/draw`): on Windows the manager
 hard-kills apps, so nothing at shutdown ever runs. The manager starts the app with `--host` pointing
@@ -97,11 +111,13 @@ elements.
 
 ## Adding buttons
 
-Add the file name (with its extension) to `assets/buttons.txt` and restart: the app downloads it on
-startup. To look at the collection first, `python tools/fetch_buttons.py --all` fills the cache with
-every image the page lists (it needs the site's index, so it takes a while). `--list mine.txt` fetches
-your own list. Images are any GIF/PNG; only the first frame of an animated one is used, and every
-button is fitted to 72x15 at load, so 80x15 files look best.
+Nothing to do when the collection grows: `--follow on` (the default) picks the new files up at the
+next check, downloads them and adds them to the rotation. To pin a button that is not new, add its
+file name (with its extension) to `assets/buttons.txt` and restart: the app downloads it on startup.
+To look at the collection first, `python tools/fetch_buttons.py --all` fills the cache with every
+image the page lists (4,500+, so it takes a while). `--list mine.txt` fetches your own list. Images are
+any GIF/PNG; only the first frame of an animated one is used, and every button is fitted to 72x15 at
+load, so 80x15 files look best.
 
 ## Preview
 

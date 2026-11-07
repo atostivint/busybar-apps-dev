@@ -8,7 +8,9 @@
 The manager starts the app with --host 127.0.0.1:8321 and proxies to the bar.
 
 The button images are not in this repository: assets/buttons.txt lists what the app wants and the
-first start downloads them into cache/buttons/ (kept between runs, works offline).
+first start downloads them into cache/buttons/ (kept between runs, works offline). The app also
+follows the collection: at startup and every --follow-every hours it reads the site's index and adds
+the buttons that appeared there since the previous check, so new entries show up on their own.
 
 The front display is 72x16, so an 80x15 button is fitted to 72x15 and drawn at the top: the whole
 button is visible and fills almost the whole screen. Resampling would turn the 5 px button text into
@@ -40,7 +42,8 @@ from controls import Controls
 
 APP = "stb-clock"
 HERE = Path(__file__).resolve().parent
-CACHE = HERE / "cache" / "buttons"
+STATE = HERE / "cache"              # the wanted list and the site's index as of the last check
+CACHE = STATE / "buttons"
 
 
 def args():
@@ -60,6 +63,10 @@ def args():
     p.add_argument("--start", type=int, default=0, help="badge index to start on")
     p.add_argument("--shuffle", default="on", choices=("on", "off"),
                    help="shuffle the order at start")
+    p.add_argument("--follow", default="on", choices=("on", "off"),
+                   help="add the buttons that appear on the site")
+    p.add_argument("--follow-every", type=int, default=6,
+                   help="hours between site checks (0 = startup only)")
     p.add_argument("--priority", type=int, default=60, help="display priority 1-100")
     return p.parse_args()
 
@@ -108,12 +115,36 @@ def draw(base, elements, priority):
     return False
 
 
+def refresh(folder, badges, fresh, log=print):
+    """Download the files a site check just found and append their badges to the rotation."""
+    if not fresh:
+        return 0
+    folder, have, failed = source.ensure(folder, fresh, log)
+    if failed:
+        log(f"buttons: {len(failed)} new file(s) could not be downloaded")
+    if not have:
+        return 0
+    stems = {b.name for b in badges}
+    new = [b for b in belt.load(folder, names=set(have)) if b.name not in stems]
+    badges.extend(new)
+    if new:
+        log(f"buttons: {len(new)} new badge(s) in the rotation: "
+            f"{', '.join(b.name for b in new[:6])}")
+    return len(new)
+
+
 def main():
     a = args()
     base = "http://" + a.host.replace("http://", "").rstrip("/")
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
-    wanted = source.names(HERE / "assets" / "buttons.txt")
+    seed = source.names(HERE / "assets" / "buttons.txt")
+    wanted = source.read_names(STATE / "wanted.txt")
+    known = set(seed)
+    wanted = seed + [n for n in wanted if n not in known]
+    if a.follow == "on":
+        wanted, _ = source.follow(STATE, wanted)
+        source.write_names(STATE / "wanted.txt", wanted)
     folder, have, failed = source.ensure(CACHE, wanted)
     if not have:
         sys.exit("no buttons: the download failed and cache/buttons is empty")
@@ -130,14 +161,16 @@ def main():
     controls = Controls(base) if a.wheel == "on" else None
 
     print(f"{n} badges at {badges[0].w}x{badges[0].h} ({len(have)} cached, {len(failed)} failed), "
-          f"hold {hold} s, clock {a.clock}"
-          f", "
-          f"{'wheel on' if controls else 'wheel off'}, start {badges[index].name}", flush=True)
+          f"hold {hold} s, clock {a.clock}, "
+          f"{'wheel on' if controls else 'wheel off'}, follow {a.follow}, "
+          f"start {badges[index].name}", flush=True)
     clear(base)
 
     # Swap times follow the monotonic clock so a slow draw cannot accumulate drift; the minute
     # boundary comes from the wall clock, because that is what the digits show.
     swap_due = time.monotonic() + hold
+    every = max(0, a.follow_every) * 3600
+    next_sync = time.monotonic() + every if (a.follow == "on" and every) else None
     last_hhmm = None
     pick_corner = True
     while True:
@@ -149,6 +182,12 @@ def main():
             swap_due += hold
             if swap_due <= woke:        # stalled for longer than a period: re-anchor, never burst
                 swap_due = woke + hold
+        if next_sync is not None and woke >= next_sync:
+            wanted, fresh = source.follow(STATE, wanted)
+            source.write_names(STATE / "wanted.txt", wanted)
+            if refresh(folder, badges, fresh):
+                n = len(badges)
+            next_sync = woke + every
 
         wall = time.time()
         hhmm = time.strftime("%H:%M", time.localtime(wall))
