@@ -1,5 +1,7 @@
 # busybar-apps-dev
 
+![busybar-apps-dev: a white bar with BUSY lit in orange on its LED screen](docs/banner.png)
+
 Apps for the [BUSY Bar](https://busy.app) (72×16 RGB LED display), written in Python with the standard
 library only. They work with [busybar-manager](https://github.com/maxswinkels/busybar-manager) or
 on their own.
@@ -124,3 +126,7 @@ Each app is a folder under `apps/` with `app.py` (argparse options become dashbo
 `CLAUDE.md` lists what I learned about the bar's behaviour while building this: redraw and z-order
 quirks, upload timeouts, how the charge animations are generated, and how to verify changes by
 capturing the real screen.
+
+The logo is drawn the same way, not hand-drawn: `python tools/gen_logo.py` regenerates
+`docs/logo.png` (the square avatar) and `docs/banner.png` (the banner above) from the bar's real
+proportions, its LED pitch and its "BUSY" wordmark set in the 3×5 pixel font.
