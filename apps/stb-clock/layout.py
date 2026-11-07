@@ -211,7 +211,9 @@ def clock_element(badge, hhmm, corner="bottom-left", mode="inverse", outline=Fal
                             {(xx, yy): (0, 0, 0) for yy in range(y, y + h) for xx in range(x, x + w)}
                             | {p: (255, 255, 255) for p in glyphs})
     if style == "outline":                   # hollow digits: the halo only, the artwork inside
-        return _xpm_element(w, h, x, y, _ring(glyphs, _ring_ink(badge, hhmm, corner, align)))
+        halo = _ring_ink(badge, hhmm, corner, align)
+        if halo == (0, 0, 0):                # a white halo on a light button is unreadable: stay filled
+            return _xpm_element(w, h, x, y, _ring(glyphs, halo))
     cells = _ringed(glyphs) if outline else glyphs
     return _xpm_element(w, h, x, y, cells)
 
@@ -291,8 +293,9 @@ def frame_canvas(badge, hhmm, corner="bottom-left", mode="inverse", outline=Fals
         for (px, py) in glyphs:
             c.px(px, py, (255, 255, 255))
         return c
-    cells = (_ring(glyphs, _ring_ink(badge, hhmm, corner, align)) if style == "outline"
-             else _ringed(glyphs) if outline else glyphs)
+    halo = _ring_ink(badge, hhmm, corner, align) if style == "outline" else None
+    cells = (_ring(glyphs, halo) if style == "outline" and halo == (0, 0, 0)
+             else _ringed(glyphs) if outline or style == "outline" else glyphs)
     for (x, y), rgb in cells.items():
         c.px(x, y, rgb)
     return c
