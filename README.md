@@ -9,25 +9,30 @@ on their own.
 ![Steal These Buttons on the BUSY Bar](apps/stb-clock/preview.gif)
 
 One whole classic 80×15 web button at a time (`apps/stb-clock`), from the
-[Steal These Buttons](https://taylor.fyi/buttons/) collection (downloaded into a local cache on the
-first start, no images in this repo), swapped every 10 seconds with a hard cut. The time is white 3×5 digits with a 1 px black outline, drawn straight on the artwork, and it
-moves to the next corner on every swap so it never hides the same part of the button.
+[Steal These Buttons](https://taylor.fyi/buttons/) collection, swapped every 10 seconds with a hard
+cut. The time is drawn transparently on the artwork: black or white 3×5 digits, chosen per button, in
+the corner where they read best and cover the least.
 
-- The 80 px badge does not fit the 72 px screen, and scaling smears its 1 px glyph strokes, so the 8
+- **No button image lives in this repository.** `assets/buttons.txt` lists the 85 wanted file names;
+  the first start downloads the missing ones into `cache/buttons/` (git-ignored), which then works
+  offline. Delete the folder to fetch everything again.
+- The 80 px button does not fit the 72 px screen, and scaling smears its 1 px glyph strokes, so the 8
   columns with the least horizontal contrast (background, padding, gaps between letters) are deleted:
-  every displayed pixel is an original pixel.
-- 85 buttons (the `.gif`/`.png` twins of the same button are collapsed), shuffled at every start.
-- **Turn the wheel** to step through them, click it to go one forward.
-- The clock is transparent (black or white digits only) and picks the corner where it can be read
-  and covers the least artwork, flush against the button's border; a 1 px halo, or a small plate on
-  photo-like buttons, appears only when the art leaves no other way.
-- Two elements and two draws per minute plus one per swap: the bar costs 40–110 ms per draw.
+  every displayed pixel is an original pixel. 85 buttons, shuffled at every start.
+- **Turn the wheel** to step through them, click it to go one forward; the auto swap waits a full
+  `--hold` after a manual pick.
+- The clock picks its corner and alignment per button (readable first, then the emptiest spot, flush
+  against the border). A 1 px halo - or, on the one busy photo button, a small plate - appears only
+  when the artwork leaves no other way; `--clock-style outline` gives hollow digits with a black halo.
+- Two elements, one draw per swap and one per minute: the bar costs 40-110 ms per draw, and frequent
+  draws made it glitch.
 
     python apps/stb-clock/app.py --host 10.0.4.20      # or enable it in the manager
-    python apps/stb-clock/app.py --hold 30 --no-clock-cycle
+    python apps/stb-clock/app.py --hold 30 --clock top-left --wheel off
 
-`apps/stb-clock/README.md` has the options and how to add your own button names. The buttons belong
-to their authors: the repo only carries the list, and the app caches what it downloads.
+`apps/stb-clock/README.md` has the full option list, how the pixel fitting and clock placement work,
+and how to add your own button names. The buttons belong to their authors: the repo carries only the
+list, and the app caches what it downloads.
 
 ## Halloween Clock
 

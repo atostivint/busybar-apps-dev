@@ -7,7 +7,8 @@ sliding, no fading, no animation.
 The buttons come from the [Steal These Buttons](https://taylor.fyi/buttons/) collection. **No button
 image is stored in this repository**: `assets/buttons.txt` lists the 85 wanted file names, and on the
 first start the app downloads the missing ones into `cache/buttons/` (git-ignored). The cache is kept
-between runs and works offline; delete the folder to fetch everything again. Some buttons exist twice
+between runs and works offline; delete the folder to fetch everything again. The first start
+therefore takes a few seconds longer (85 downloads, about 80 KB). Some buttons exist twice
 as `name.gif` and `name.png`; only one file per button is used (animated GIF > GIF > PNG), and the
 order is shuffled at every start.
 
@@ -48,7 +49,7 @@ order is shuffled at every start.
 ## Controls
 
 The bar's wheel is read from its own state stream (`/api/status/ws`, see `controls.py`): turn it to
-step through the buttons, click it to go one forward. `--no-wheel` ignores it.
+step through the buttons, click it to go one forward. `--wheel off` ignores it.
 
 ## Options
 
@@ -61,7 +62,7 @@ step through the buttons, click it to go one forward. `--no-wheel` ignores it.
 | `--clock-color` | `auto` | digit colour: `auto` black/white, or `inverse` of the button under the digits |
 | `--clock-style` | `filled` | `filled` digits, or `outline` (hollow: only the halo is painted, the artwork shows inside the strokes; black halo only - white falls back to filled) |
 | `--shuffle` | `on` | shuffle the order at start (`off` keeps filename order) |
-| `--start` | 0 | badge index to start on (with `--no-shuffle`) |
+| `--start` | 0 | badge index to start on (with `--shuffle off`) |
 | `--priority` | 60 | display priority 1-100 (the manager's variation priority overrides it) |
 | `--host` | `10.0.4.20` | bar address; the manager passes its own |
 
@@ -70,12 +71,13 @@ step through the buttons, click it to go one forward. `--no-wheel` ignores it.
 The badge is a single 72x15 `xpmbitmap` (`b0l`); `belt.py` keeps the split at 72 columns for badges
 wider than the display, but at the 72 px target only one element is emitted.
 
-The clock is a second, small `xpmbitmap` (`clock`, 19x7): the digits only, `none` everywhere else, so
-the button shows through. `layout.clock_colours()` samples the button under the digits and returns one
-colour (the inverse, or black/white); `--outline on` adds the halo. `layout.choose_corner()` picks the corner (readable first,
-then emptiest), `layout.choose_align()` nudges the element flush against the border (or 1-2 px in when
-needed), `layout.needs_outline()` / `layout.needs_plate()` decide the fallbacks, and
-`layout.clock_at()` places the element.
+The clock is a second, small `xpmbitmap` (`clock`, 19x7): the digits only (`none` everywhere else, so
+the button shows through), or just their halo in the hollow style, or a solid plate on the one photo
+button. `layout.clock_colours()` samples the button under the digits and picks black or white
+(`--clock-color inverse` uses the negative instead). `layout.choose_corner()` picks the corner
+(readable first, then emptiest), `layout.choose_align()` nudges the element flush against the border
+(or 1-2 px in when needed), `layout.needs_outline()` / `layout.needs_plate()` decide the fallbacks,
+and `layout.clock_at()` places the element.
 
 Every draw sends the whole scene, button first and clock last, because the element order inside one
 draw is the z-order and a single element sent on its own can land behind the others. The elements keep
