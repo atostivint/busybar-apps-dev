@@ -17,16 +17,17 @@ start.
   remaining pixel is an original pixel and the 5 px button text stays sharp. The frame columns are
   never dropped. Result: 72x15, all 15 rows, 72 of the 80 columns (nothing meaningful is lost).
 - **The clock is drawn on the image, transparent**: only its own glyphs are painted, everything else
-  is `none`, so the button shows through. The digit colour is black or white, whichever wins against
-  the *median* brightness of the pixels the time will cover (the median, not the average: one black
-  letter crossing the area must not flip a white button to white digits). `--clock-color inverse` uses
-  the negative of the covered pixels instead; `--outline on` adds a 1 px black halo for the buttons
-  where neither reads well.
-- **It goes where the artwork is emptiest**: `--clock auto` (the default) scores the four corners by
-  the edge energy inside the 19x7 clock area (flat background ~0, border ~0, text and logos high) and
-  takes the lowest. When that is the corner already in use, it accepts a corner up to 15 % busier, so
-  the clock still moves from button to button instead of parking on the same empty spot for 60 of the
-  85 buttons. `--clock bottom-left` (etc.) pins one corner.
+  is `none`, so the button shows through. The digit colour is black or white, whichever leaves the
+  fewest glyph pixels under a readable contrast (`bad_fraction()`), so it is a per-button choice.
+- **It goes where it can be read**: `--clock auto` (the default) rejects corners where more than 5 %
+  of the digits would be hard to see, then takes the emptiest of the rest (edge energy: flat
+  background ~0, text and logos high). A 15 % busyness nudge keeps it moving from button to button
+  instead of parking on the same empty spot for 60 of the 85 buttons. `--clock bottom-left` (etc.)
+  pins one corner.
+- **Two small fallbacks, only when the art leaves no choice**: if a few digits are still hard to see
+  (3 of 85 buttons) the clock gets a 1 px halo in the opposite colour; if the button is a busy photo
+  where no corner is clear (1 of 85, The Beatles), it gets a small solid black plate. Everything else
+  is painted on the artwork with no extra pixel.
 - **The wheel switches pictures**: turn it forward or back to step through the buttons (or click it to
   go one forward); the automatic swap pauses for a full `--hold` after a manual pick. `--wheel off`
   ignores it, and the app runs unchanged without the state stream.
@@ -47,7 +48,7 @@ step through the buttons, click it to go one forward. `--no-wheel` ignores it.
 | `--hold` | 10 | seconds each button stays on screen (3-120) |
 | `--clock` | `auto` | `auto` = the emptiest corner, or pin `bottom-left`, `bottom-right`, `top-right`, `top-left` |
 | `--wheel` | `on` | turn the wheel (or click it) to change picture (`off` ignores it) |
-| `--outline` | `off` | 1 px black halo around the clock digits |
+| `--outline` | `off` | force the 1 px halo (it is added automatically when needed) |
 | `--clock-color` | `auto` | digit colour: `auto` black/white, or `inverse` of the button under the digits |
 | `--shuffle` | `on` | shuffle the order at start (`off` keeps filename order) |
 | `--start` | 0 | badge index to start on (with `--no-shuffle`) |
@@ -61,8 +62,9 @@ wider than the display, but at the 72 px target only one element is emitted.
 
 The clock is a second, small `xpmbitmap` (`clock`, 19x7): the digits only, `none` everywhere else, so
 the button shows through. `layout.clock_colours()` samples the button under the digits and returns one
-colour (the inverse, or black/white); `--outline on` adds the halo. `layout.clock_at()` places it flush in one of the four
-corners; `layout.choose_corner()` picks the emptiest one per button.
+colour (the inverse, or black/white); `--outline on` adds the halo. `layout.choose_corner()` picks the corner (readable first,
+then emptiest), `layout.needs_outline()` / `layout.needs_plate()` decide the fallbacks, and
+`layout.clock_at()` places the element flush in that corner.
 
 Every draw sends the whole scene, button first and clock last, because the element order inside one
 draw is the z-order and a single element sent on its own can land behind the others. The elements keep

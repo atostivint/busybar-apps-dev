@@ -143,7 +143,10 @@ def main():
         if a.clock == "auto" and pick_corner:
             corner = layout.choose_corner(badges[index], hhmm, corner)
             pick_corner = False
-        els = layout.elements(badges[index], index, hhmm, corner, a.clock_color, a.outline == "on")
+        badge = badges[index]
+        plate = layout.needs_plate(badge, corner, hhmm)
+        outline = not plate and (a.outline == "on" or layout.needs_outline(badge, corner, hhmm))
+        els = layout.elements(badge, index, hhmm, corner, a.clock_color, outline, plate)
         draw(base, els, a.priority)
 
         if hhmm != last_hhmm:

@@ -68,16 +68,21 @@ def main():
         state["corner"] = layout.choose_corner(badge, hhmm, state["corner"])
         return state["corner"]
 
+    def render(badge):
+        corner = corner_for(badge)
+        plate = layout.needs_plate(badge, corner, hhmm)
+        outline = not plate and (a.outline == "on" or layout.needs_outline(badge, corner, hhmm))
+        return layout.frame_canvas(badge, hhmm, corner, a.clock_color, outline, plate)
+
     first = badges[start]
-    image(layout.frame_canvas(first, hhmm, corner_for(first), a.clock_color, a.outline == "on"),
-          scale).save(out.with_suffix(".png"))
+    image(render(first), scale).save(out.with_suffix(".png"))
 
     count = max(1, min(n, a.count))
     frames, names = [], []
     for k in range(count):
         badge = badges[(start + k) % n]
         names.append(badge.name)
-        frame = layout.frame_canvas(badge, hhmm, corner_for(badge), a.clock_color, a.outline == "on")
+        frame = render(badge)
         frames.append(image(frame, scale).convert("P", palette=Image.ADAPTIVE, colors=64))
     frames[0].save(out.with_suffix(".gif"), save_all=True, append_images=frames[1:],
                    duration=1000, loop=0, optimize=True)

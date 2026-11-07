@@ -17,6 +17,9 @@ import canvas
 CARD_GAP = 1                    # between two glyphs of the clock
 CORNERS = ("bottom-left", "bottom-right", "top-right", "top-left")   # clockwise
 MOVE_WITHIN = 1.15              # auto: accept a slightly busier corner to keep the clock moving
+CLEAR = 60                      # luminance gap under which a digit is hard to see
+OUTLINE_ABOVE = 0.02            # share of hard-to-see glyph pixels that asks for a 1 px halo
+PLATE_ABOVE = 0.15              # above this the halo is not enough: solid plate
 NEIGHBOURS = ((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
 XPM_CHARS = "abcdefghijklmnopqrstuvwxyz#$%&'()*+,-/0123456789:;<=>?@ABCDEFGHIJKLMNOPQ"
 
@@ -62,18 +65,58 @@ def busy_score(badge, corner, hhmm="00:00"):
     return e
 
 
-def choose_corner(badge, hhmm="00:00", previous=None):
-    """The emptiest corner; when it is the one already used, a near-tie moves the clock instead.
+def _covered(badge, corner, hhmm="00:00"):
+    """The luminance of the button pixels the digits would cover."""
+    px = badge.quant.load()
+    return [_lum(px[x, y]) for (x, y) in clock_cells(hhmm, corner, None, False)
+            if 0 <= x < canvas.W and 0 <= y < badge.h]
 
-    Without that nudge, 61 of the 85 buttons would keep the clock in the same corner: same button
-    layout, same empty spot. Accepting a corner up to 15 % busier keeps it moving without burying the
-    time in the logo.
+
+def _pick_ink(vals):
+    """Black or white: the colour that leaves the fewest digits under CLEAR contrast, then the strongest."""
+    best = None
+    for col in (0, 255):
+        key = (sum(1 for v in vals if abs(v - col) >= CLEAR), sum(abs(v - col) for v in vals))
+        if best is None or key > best[0]:
+            best = (key, col)
+    return (best[1], best[1], best[1])
+
+
+def bad_fraction(badge, corner, hhmm="00:00"):
+    """Share of the glyph pixels that would be hard to see there with the best of black and white."""
+    vals = _covered(badge, corner, hhmm)
+    if not vals:
+        return 1.0
+    ink = _lum(_pick_ink(vals))
+    return sum(1 for v in vals if abs(v - ink) < CLEAR) / len(vals)
+
+
+def choose_corner(badge, hhmm="00:00", previous=None):
+    """The corner where the clock reads, and among those the emptiest.
+
+    Busyness alone put the time on the worst spot: a black logo stroke under the digits hides them,
+    however empty the rest of the corner is. So a corner is only considered if its glyph pixels are
+    clear (bad_fraction <= 0.05), and among those the least busy wins; if none is that clean, the
+    clearest one is used and gets a halo. A 15 % busyness nudge keeps the clock moving from button to
+    button instead of parking on the same spot for 60 of the 85 buttons.
     """
-    scores = {c: busy_score(badge, c, hhmm) for c in CORNERS}
-    order = sorted(CORNERS, key=lambda c: scores[c])
-    if previous and order[0] == previous and scores[order[1]] <= scores[order[0]] * MOVE_WITHIN:
+    bad = {c: bad_fraction(badge, c, hhmm) for c in CORNERS}
+    busy = {c: busy_score(badge, c, hhmm) for c in CORNERS}
+    ok = [c for c in CORNERS if bad[c] <= 0.05] or [min(CORNERS, key=lambda c: bad[c])]
+    order = sorted(ok, key=lambda c: busy[c])
+    if previous and order[0] == previous and len(order) > 1 and busy[order[1]] <= busy[order[0]] * MOVE_WITHIN:
         return order[1]
     return order[0]
+
+
+def needs_outline(badge, corner, hhmm="00:00"):
+    """True when some digits would be hard to see: a 1 px halo fixes exactly those pixels."""
+    return bad_fraction(badge, corner, hhmm) > OUTLINE_ABOVE
+
+
+def needs_plate(badge, corner, hhmm="00:00"):
+    """True for the photo-like buttons, where no corner and no halo leaves the digits readable."""
+    return bad_fraction(badge, corner, hhmm) > PLATE_ABOVE
 
 
 def _lum(rgb):
@@ -108,11 +151,7 @@ def clock_colours(badge, hhmm, corner="bottom-left", mode="inverse"):
     if mode == "inverse":
         avg = tuple(round(c / len(lum)) for c in total)
         return {p: _inverse(avg) for p in pixels}
-    # The median, not the average: one black letter crossing the area must not flip a light button to
-    # white digits. Median luminance says what most of the covered pixels are.
-    lum.sort()
-    colour = (0, 0, 0) if lum[len(lum) // 2] > 128 else (255, 255, 255)
-    return {p: colour for p in pixels}
+    return {p: _pick_ink(lum) for p in pixels}
 
 
 def clock_cells(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=False):
@@ -143,17 +182,35 @@ def clock_cells(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=Fals
     return {**ring, **cells}
 
 
-def clock_element(badge, hhmm, corner="bottom-left", mode="inverse", outline=False):
-    """The clock as one xpmbitmap element: digits only, everything else transparent."""
+def clock_element(badge, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False):
+    """The clock as one xpmbitmap element: digits only, everything else transparent (or a solid plate)."""
     w, h = clock_size(hhmm)
     x, y = clock_at(corner, hhmm)
     glyphs = clock_colours(badge, hhmm, corner, mode)
+    if plate:                                # photo-like button: white digits on solid black
+        return _xpm_element(w, h, x, y,
+                            {(xx, yy): (0, 0, 0) for yy in range(y, y + h) for xx in range(x, x + w)}
+                            | {p: (255, 255, 255) for p in glyphs})
+    cells = _ringed(glyphs) if outline else glyphs
+    return _xpm_element(w, h, x, y, cells)
+
+
+def _ringed(glyphs):
+    """The digits plus a 1 px halo in the opposite colour, so they read on any artwork."""
+    ink = next(iter(glyphs.values()), (255, 255, 255))
+    halo = (0, 0, 0) if sum(ink) > 380 else (255, 255, 255)
     cells = {}
-    if outline:
-        for p, c in clock_cells(hhmm, corner, (0, 0, 0), True).items():
-            if p not in glyphs:             # the black halo, the glyphs win on overlap
-                cells[p] = c
+    for (x, y) in glyphs:
+        for dx, dy in NEIGHBOURS:
+            p = (x + dx, y + dy)
+            if p not in glyphs and 0 <= p[0] < canvas.W and 0 <= p[1] < canvas.H:
+                cells[p] = halo
     cells.update(glyphs)
+    return cells
+
+
+def _xpm_element(w, h, x, y, cells):
+    """One xpmbitmap from a {(screen x, screen y): colour} map; missing pixels are transparent."""
     lookup, order, rows = {}, [], []
     for yy in range(y, y + h):
         row = []
@@ -173,20 +230,25 @@ def clock_element(badge, hhmm, corner="bottom-left", mode="inverse", outline=Fal
             "data": head + "\n".join(rows) + "\n"}
 
 
-def elements(badge, index, hhmm, corner="bottom-left", mode="inverse", outline=False):
+def elements(badge, index, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False):
     """The draw list: the badge, then the clock on top."""
     els = badge.elements(0, 0, 0, "")
-    els.append(clock_element(badge, hhmm, corner, mode, outline))
+    els.append(clock_element(badge, hhmm, corner, mode, outline, plate))
     return els
 
 
-def frame_canvas(badge, hhmm, corner="bottom-left", mode="inverse", outline=False):
+def frame_canvas(badge, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False):
     """The whole 72x16 frame as a Canvas, for the preview."""
     c = canvas.Canvas()
     c.blit(badge.quant, 0, 0)
     glyphs = clock_colours(badge, hhmm, corner, mode)
-    cells = clock_cells(hhmm, corner, (0, 0, 0), outline) if outline else {}
-    cells.update(glyphs)
-    for (x, y), rgb in cells.items():
+    if plate:
+        x, y = clock_at(corner, hhmm)
+        w, h = clock_size(hhmm)
+        c.rect(x, y, w, h, (0, 0, 0))
+        for (px, py) in glyphs:
+            c.px(px, py, (255, 255, 255))
+        return c
+    for (x, y), rgb in (_ringed(glyphs) if outline else glyphs).items():
         c.px(x, y, rgb)
     return c
