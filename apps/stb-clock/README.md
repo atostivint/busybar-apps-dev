@@ -17,18 +17,19 @@ start.
   remaining pixel is an original pixel and the 5 px button text stays sharp. The frame columns are
   never dropped. Result: 72x15, all 15 rows, 72 of the 80 columns (nothing meaningful is lost).
 - **The clock is drawn on the image, transparent**: only its own glyphs are painted, everything else
-  is `none`, so the button shows through. The digit colour is picked from the pixels the time will
-  cover: by default the **inverse** of their average colour (a coloured negative, near-black on a
-  light button, near-white on a dark one, cyan on a red one), or `--clock-color auto` for plain
-  black/white. A single colour is used for the whole clock on purpose: inverting pixel by pixel turned
-  the digits into camouflage on busy artwork. `--outline on` adds a 1 px black halo for the buttons
+  is `none`, so the button shows through. The digit colour is black or white, whichever wins against
+  the *median* brightness of the pixels the time will cover (the median, not the average: one black
+  letter crossing the area must not flip a white button to white digits). `--clock-color inverse` uses
+  the negative of the covered pixels instead; `--outline on` adds a 1 px black halo for the buttons
   where neither reads well.
+- **It goes where the artwork is emptiest**: `--clock auto` (the default) scores the four corners by
+  the edge energy inside the 19x7 clock area (flat background ~0, border ~0, text and logos high) and
+  takes the lowest. When that is the corner already in use, it accepts a corner up to 15 % busier, so
+  the clock still moves from button to button instead of parking on the same empty spot for 60 of the
+  85 buttons. `--clock bottom-left` (etc.) pins one corner.
 - **The wheel switches pictures**: turn it forward or back to step through the buttons (or click it to
   go one forward); the automatic swap pauses for a full `--hold` after a manual pick. `--wheel off`
   ignores it, and the app runs unchanged without the state stream.
-- **The clock walks the corners**: on each badge swap it moves one corner clockwise
-  (`bottom-left` -> `bottom-right` -> `top-right` -> `top-left`), so the same part of the artwork is
-  not hidden every time. `--clock` picks the starting corner, `--no-clock-cycle` parks it.
 - **Draws are rare**: one when the button swaps, one at each minute boundary when the digits change.
   Nothing else. A draw on the bar costs ~40-110 ms of its web server, and frequent draws made the
   display glitch (dropped elements, 400 "elements number limit exceeded"), which is why there is no
@@ -44,11 +45,10 @@ step through the buttons, click it to go one forward. `--no-wheel` ignores it.
 | option | default | |
 |---|---|---|
 | `--hold` | 10 | seconds each button stays on screen (3-120) |
-| `--clock` | `bottom-left` | corner the clock starts in (`bottom-left`, `bottom-right`, `top-right`, `top-left`) |
-| `--cycle` | `on` | move the clock one corner clockwise on every badge swap (`off` parks it) |
+| `--clock` | `auto` | `auto` = the emptiest corner, or pin `bottom-left`, `bottom-right`, `top-right`, `top-left` |
 | `--wheel` | `on` | turn the wheel (or click it) to change picture (`off` ignores it) |
 | `--outline` | `off` | 1 px black halo around the clock digits |
-| `--clock-color` | `inverse` | digit colour: `inverse` of the button under the digits, or `auto` black/white |
+| `--clock-color` | `auto` | digit colour: `auto` black/white, or `inverse` of the button under the digits |
 | `--shuffle` | `on` | shuffle the order at start (`off` keeps filename order) |
 | `--start` | 0 | badge index to start on (with `--no-shuffle`) |
 | `--priority` | 60 | display priority 1-100 (the manager's variation priority overrides it) |
@@ -62,7 +62,7 @@ wider than the display, but at the 72 px target only one element is emitted.
 The clock is a second, small `xpmbitmap` (`clock`, 19x7): the digits only, `none` everywhere else, so
 the button shows through. `layout.clock_colours()` samples the button under the digits and returns one
 colour (the inverse, or black/white); `--outline on` adds the halo. `layout.clock_at()` places it flush in one of the four
-corners; the app advances the corner on every swap.
+corners; `layout.choose_corner()` picks the emptiest one per button.
 
 Every draw sends the whole scene, button first and clock last, because the element order inside one
 draw is the z-order and a single element sent on its own can land behind the others. The elements keep

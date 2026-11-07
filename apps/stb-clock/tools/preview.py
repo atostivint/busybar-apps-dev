@@ -60,11 +60,16 @@ def main():
     scale = max(1, a.scale)
     out = HERE / a.out
 
-    def corner_for(step):
-        return layout.next_corner(a.clock, step) if a.cycle == "on" else a.clock
+    state = {"corner": a.clock if a.clock != "auto" else None}
+
+    def corner_for(badge):
+        if a.clock != "auto":
+            return a.clock
+        state["corner"] = layout.choose_corner(badge, hhmm, state["corner"])
+        return state["corner"]
 
     first = badges[start]
-    image(layout.frame_canvas(first, hhmm, corner_for(0), a.clock_color, a.outline == "on"),
+    image(layout.frame_canvas(first, hhmm, corner_for(first), a.clock_color, a.outline == "on"),
           scale).save(out.with_suffix(".png"))
 
     count = max(1, min(n, a.count))
@@ -72,7 +77,7 @@ def main():
     for k in range(count):
         badge = badges[(start + k) % n]
         names.append(badge.name)
-        frame = layout.frame_canvas(badge, hhmm, corner_for(k), a.clock_color, a.outline == "on")
+        frame = layout.frame_canvas(badge, hhmm, corner_for(badge), a.clock_color, a.outline == "on")
         frames.append(image(frame, scale).convert("P", palette=Image.ADAPTIVE, colors=64))
     frames[0].save(out.with_suffix(".gif"), save_all=True, append_images=frames[1:],
                    duration=1000, loop=0, optimize=True)

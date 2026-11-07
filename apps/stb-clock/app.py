@@ -42,16 +42,14 @@ def args():
     p = argparse.ArgumentParser(description="One whole classic web button at a time, with the time")
     p.add_argument("--host", default="10.0.4.20", help="bar address (the manager passes its own)")
     p.add_argument("--hold", type=int, default=10, help="seconds each button stays on screen (3-120)")
-    p.add_argument("--clock", default="bottom-left", choices=layout.CORNERS,
-                   help="corner the clock starts in")
-    p.add_argument("--cycle", default="on", choices=("on", "off"),
-                   help="move the clock corner each swap")
+    p.add_argument("--clock", default="auto", choices=("auto",) + layout.CORNERS,
+                   help="clock corner: auto = emptiest spot")
     p.add_argument("--wheel", default="on", choices=("on", "off"),
                    help="wheel switches picture")
     p.add_argument("--outline", default="off", choices=("on", "off"),
                    help="black halo around the digits")
-    p.add_argument("--clock-color", default="inverse", choices=("inverse", "auto"),
-                   help="digit colour: inverse or black/white")
+    p.add_argument("--clock-color", default="auto", choices=("inverse", "auto"),
+                   help="digit colour: black/white or inverse")
     p.add_argument("--start", type=int, default=0, help="badge index to start on")
     p.add_argument("--shuffle", default="on", choices=("on", "off"),
                    help="shuffle the order at start")
@@ -116,12 +114,12 @@ def main():
     n = len(badges)
     index = max(0, min(n - 1, a.start))
     hold = max(3, min(120, a.hold))
-    corner = a.clock
+    corner = a.clock if a.clock != "auto" else layout.choose_corner(badges[index], "00:00")
 
     controls = Controls(base) if a.wheel == "on" else None
 
-    print(f"{n} badges at {badges[0].w}x{badges[0].h}, hold {hold} s, clock {corner}"
-          f"{' (cycling)' if a.cycle == 'on' else ''}, "
+    print(f"{n} badges at {badges[0].w}x{badges[0].h}, hold {hold} s, clock {a.clock}"
+          f", "
           f"{'wheel on' if controls else 'wheel off'}, start {badges[index].name}", flush=True)
     clear(base)
 
@@ -129,19 +127,22 @@ def main():
     # boundary comes from the wall clock, because that is what the digits show.
     swap_due = time.monotonic() + hold
     last_hhmm = None
+    pick_corner = True
     while True:
         # Advance first, then draw once: a swap costs one draw, not one redraw of the old badge.
         woke = time.monotonic()
         if woke >= swap_due:
             index = (index + 1) % n
-            if a.cycle == "on":
-                corner = layout.next_corner(corner)
+            pick_corner = True
             swap_due += hold
             if swap_due <= woke:        # stalled for longer than a period: re-anchor, never burst
                 swap_due = woke + hold
 
         wall = time.time()
         hhmm = time.strftime("%H:%M", time.localtime(wall))
+        if a.clock == "auto" and pick_corner:
+            corner = layout.choose_corner(badges[index], hhmm, corner)
+            pick_corner = False
         els = layout.elements(badges[index], index, hhmm, corner, a.clock_color, a.outline == "on")
         draw(base, els, a.priority)
 
@@ -166,8 +167,7 @@ def main():
             steps, clicks = controls.take()
             if steps or clicks:
                 index = (index + steps + (1 if clicks else 0)) % n
-                if a.cycle == "on":
-                    corner = layout.next_corner(corner)
+                pick_corner = True
                 swap_due = time.monotonic() + hold      # the manual pick gets a full hold
 
 

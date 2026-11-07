@@ -16,6 +16,7 @@ import canvas
 
 CARD_GAP = 1                    # between two glyphs of the clock
 CORNERS = ("bottom-left", "bottom-right", "top-right", "top-left")   # clockwise
+MOVE_WITHIN = 1.15              # auto: accept a slightly busier corner to keep the clock moving
 NEIGHBOURS = ((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
 XPM_CHARS = "abcdefghijklmnopqrstuvwxyz#$%&'()*+,-/0123456789:;<=>?@ABCDEFGHIJKLMNOPQ"
 
@@ -41,6 +42,40 @@ def next_corner(corner, step=1):
     return CORNERS[(CORNERS.index(corner) + step) % len(CORNERS)]
 
 
+def busy_score(badge, corner, hhmm="00:00"):
+    """How much artwork is inside the clock area: the sum of the edge energy under the 19x7 element.
+
+    A flat background scores ~0, a border ~0, text and logos score high. The clock goes where this is
+    lowest, so turning a button into a clock covers the emptiest part of it.
+    """
+    x, y = clock_at(corner, hhmm)
+    w, h = clock_size(hhmm)
+    px = badge.quant.load()
+    e = 0
+    for yy in range(y, min(y + h, badge.h)):
+        for xx in range(x, min(x + w, canvas.W)):
+            c = px[xx, yy]
+            if xx + 1 < canvas.W:
+                e += sum(abs(c[i] - px[xx + 1, yy][i]) for i in range(3))
+            if yy + 1 < badge.h:
+                e += sum(abs(c[i] - px[xx, yy + 1][i]) for i in range(3))
+    return e
+
+
+def choose_corner(badge, hhmm="00:00", previous=None):
+    """The emptiest corner; when it is the one already used, a near-tie moves the clock instead.
+
+    Without that nudge, 61 of the 85 buttons would keep the clock in the same corner: same button
+    layout, same empty spot. Accepting a corner up to 15 % busier keeps it moving without burying the
+    time in the logo.
+    """
+    scores = {c: busy_score(badge, c, hhmm) for c in CORNERS}
+    order = sorted(CORNERS, key=lambda c: scores[c])
+    if previous and order[0] == previous and scores[order[1]] <= scores[order[0]] * MOVE_WITHIN:
+        return order[1]
+    return order[0]
+
+
 def _lum(rgb):
     return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
 
@@ -60,18 +95,24 @@ def clock_colours(badge, hhmm, corner="bottom-left", mode="inverse"):
     into camouflage as soon as the artwork under them is not flat.
     """
     total = [0, 0, 0]
-    count = 0
+    lum = []
     for (x, y) in clock_cells(hhmm, corner, None, False):
         if 0 <= x < canvas.W and 0 <= y < badge.h:
             bg = badge.quant.getpixel((x, y))
             for i in range(3):
                 total[i] += bg[i]
-            count += 1
-    avg = tuple(round(c / count) for c in total) if count else (0, 0, 0)
+            lum.append(_lum(bg))
+    pixels = clock_cells(hhmm, corner, None, False)
+    if not lum:
+        return {p: (255, 255, 255) for p in pixels}
     if mode == "inverse":
-        return {p: _inverse(avg) for p in clock_cells(hhmm, corner, None, False)}
-    colour = (0, 0, 0) if _lum(avg) > 128 else (255, 255, 255)
-    return {p: colour for p in clock_cells(hhmm, corner, None, False)}
+        avg = tuple(round(c / len(lum)) for c in total)
+        return {p: _inverse(avg) for p in pixels}
+    # The median, not the average: one black letter crossing the area must not flip a light button to
+    # white digits. Median luminance says what most of the covered pixels are.
+    lum.sort()
+    colour = (0, 0, 0) if lum[len(lum) // 2] > 128 else (255, 255, 255)
+    return {p: colour for p in pixels}
 
 
 def clock_cells(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=False):
