@@ -17,13 +17,15 @@ start.
   remaining pixel is an original pixel and the 5 px button text stays sharp. The frame columns are
   never dropped. Result: 72x15, all 15 rows, 72 of the 80 columns (nothing meaningful is lost).
 - **The clock is drawn on the image, transparent**: only its own glyphs are painted, everything else
-  is `none`, so the button shows through. The digits are black or white depending on the brightness of
-  the part of the button underneath (measured on the pixels the time will cover), which keeps the time
-  readable without a plate. `--clock-outline` adds a 1 px black halo around the glyphs for the busy
-  buttons where neither colour reads well.
+  is `none`, so the button shows through. The digit colour is picked from the pixels the time will
+  cover: by default the **inverse** of their average colour (a coloured negative, near-black on a
+  light button, near-white on a dark one, cyan on a red one), or `--clock-color auto` for plain
+  black/white. A single colour is used for the whole clock on purpose: inverting pixel by pixel turned
+  the digits into camouflage on busy artwork. `--outline on` adds a 1 px black halo for the buttons
+  where neither reads well.
 - **The wheel switches pictures**: turn it forward or back to step through the buttons (or click it to
-  go one forward); the automatic swap pauses for a full `--hold` after a manual pick. `--no-wheel`
-  turns the input off, and the app runs unchanged without the state stream.
+  go one forward); the automatic swap pauses for a full `--hold` after a manual pick. `--wheel off`
+  ignores it, and the app runs unchanged without the state stream.
 - **The clock walks the corners**: on each badge swap it moves one corner clockwise
   (`bottom-left` -> `bottom-right` -> `top-right` -> `top-left`), so the same part of the artwork is
   not hidden every time. `--clock` picks the starting corner, `--no-clock-cycle` parks it.
@@ -43,10 +45,11 @@ step through the buttons, click it to go one forward. `--no-wheel` ignores it.
 |---|---|---|
 | `--hold` | 10 | seconds each button stays on screen (3-120) |
 | `--clock` | `bottom-left` | corner the clock starts in (`bottom-left`, `bottom-right`, `top-right`, `top-left`) |
-| `--clock-cycle` | on | move the clock one corner clockwise on every badge swap (`--no-clock-cycle` to park it) |
-| `--wheel` | on | turn the wheel (or click it) to change picture (`--no-wheel` to ignore it) |
-| `--clock-outline` | off | 1 px black halo around the clock digits |
-| `--shuffle` | on | shuffle the order at startup (`--no-shuffle` keeps filename order) |
+| `--cycle` | `on` | move the clock one corner clockwise on every badge swap (`off` parks it) |
+| `--wheel` | `on` | turn the wheel (or click it) to change picture (`off` ignores it) |
+| `--outline` | `off` | 1 px black halo around the clock digits |
+| `--clock-color` | `inverse` | digit colour: `inverse` of the button under the digits, or `auto` black/white |
+| `--shuffle` | `on` | shuffle the order at start (`off` keeps filename order) |
 | `--start` | 0 | badge index to start on (with `--no-shuffle`) |
 | `--priority` | 60 | display priority 1-100 (the manager's variation priority overrides it) |
 | `--host` | `10.0.4.20` | bar address; the manager passes its own |
@@ -57,8 +60,8 @@ The badge is a single 72x15 `xpmbitmap` (`b0l`); `belt.py` keeps the split at 72
 wider than the display, but at the 72 px target only one element is emitted.
 
 The clock is a second, small `xpmbitmap` (`clock`, 19x7): the digits only, `none` everywhere else, so
-the button shows through. `layout.clock_colour()` samples the button under the digits and picks black
-or white; `--clock-outline` adds the halo. `layout.clock_at()` places it flush in one of the four
+the button shows through. `layout.clock_colours()` samples the button under the digits and returns one
+colour (the inverse, or black/white); `--outline on` adds the halo. `layout.clock_at()` places it flush in one of the four
 corners; the app advances the corner on every swap.
 
 Every draw sends the whole scene, button first and clock last, because the element order inside one
@@ -88,7 +91,7 @@ app to pick up new files.
 ```bash
 python tools/preview.py                          # preview.png + preview.gif
 python tools/preview.py --time 09:41 --start 20
-python tools/preview.py --count 10 --scale 8
+python tools/preview.py --count 10 --scale 8 --outline on --clock-color auto
 ```
 
 `preview.png` is the first button at 6x (one LED = one block). `preview.gif` shows `--count` buttons

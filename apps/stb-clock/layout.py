@@ -45,18 +45,41 @@ def _lum(rgb):
     return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
 
 
-def clock_colour(badge, hhmm, corner="bottom-left"):
-    """Black or white, whichever contrasts with the button where the digits land (transparent clock)."""
-    total = count = 0
-    for (x, y) in clock_cells(hhmm, corner, (255, 255, 255), False):
-        if 0 <= x < canvas.W and y < badge.h:
-            total += _lum(badge.quant.getpixel((x, y)))
+def _inverse(bg):
+    """The opposite of a background colour, snapped to black/white when the inverse is a muddy grey."""
+    inv = (255 - bg[0], 255 - bg[1], 255 - bg[2])
+    if abs(_lum(bg) - _lum(inv)) < 60:          # mid-grey: inverting it changes nothing readable
+        return (0, 0, 0) if _lum(bg) > 128 else (255, 255, 255)
+    return inv
+
+
+def clock_colours(badge, hhmm, corner="bottom-left", mode="inverse"):
+    """One colour for the whole clock: the inverse of the button under it, or black/white.
+
+    One colour for all glyphs, not one per pixel: inverting each pixel separately turns the digits
+    into camouflage as soon as the artwork under them is not flat.
+    """
+    total = [0, 0, 0]
+    count = 0
+    for (x, y) in clock_cells(hhmm, corner, None, False):
+        if 0 <= x < canvas.W and 0 <= y < badge.h:
+            bg = badge.quant.getpixel((x, y))
+            for i in range(3):
+                total[i] += bg[i]
             count += 1
-    return (0, 0, 0) if count and total / count > 128 else (255, 255, 255)
+    avg = tuple(round(c / count) for c in total) if count else (0, 0, 0)
+    if mode == "inverse":
+        return {p: _inverse(avg) for p in clock_cells(hhmm, corner, None, False)}
+    colour = (0, 0, 0) if _lum(avg) > 128 else (255, 255, 255)
+    return {p: colour for p in clock_cells(hhmm, corner, None, False)}
 
 
 def clock_cells(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=False):
-    """{(screen x, screen y): colour} for the digits (and outline); nothing else is painted."""
+    """{(screen x, screen y): colour} for the digits (and outline); nothing else is painted.
+
+    `colour=None` only marks the glyph pixels (the value is a placeholder): clock_colours() uses it to
+    know which background pixels the time will cover.
+    """
     x, y = clock_at(corner, hhmm)
     cells = {}
     cx = x + 1                                  # 1 px of outline on the left
@@ -79,11 +102,17 @@ def clock_cells(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=Fals
     return {**ring, **cells}
 
 
-def clock_element(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=False):
+def clock_element(badge, hhmm, corner="bottom-left", mode="inverse", outline=False):
     """The clock as one xpmbitmap element: digits only, everything else transparent."""
     w, h = clock_size(hhmm)
     x, y = clock_at(corner, hhmm)
-    cells = clock_cells(hhmm, corner, colour, outline)
+    glyphs = clock_colours(badge, hhmm, corner, mode)
+    cells = {}
+    if outline:
+        for p, c in clock_cells(hhmm, corner, (0, 0, 0), True).items():
+            if p not in glyphs:             # the black halo, the glyphs win on overlap
+                cells[p] = c
+    cells.update(glyphs)
     lookup, order, rows = {}, [], []
     for yy in range(y, y + h):
         row = []
@@ -103,18 +132,20 @@ def clock_element(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=Fa
             "data": head + "\n".join(rows) + "\n"}
 
 
-def elements(badge, index, hhmm, corner="bottom-left", outline=False):
+def elements(badge, index, hhmm, corner="bottom-left", mode="inverse", outline=False):
     """The draw list: the badge, then the clock on top."""
     els = badge.elements(0, 0, 0, "")
-    els.append(clock_element(hhmm, corner, clock_colour(badge, hhmm, corner), outline))
+    els.append(clock_element(badge, hhmm, corner, mode, outline))
     return els
 
 
-def frame_canvas(badge, hhmm, corner="bottom-left", outline=False):
+def frame_canvas(badge, hhmm, corner="bottom-left", mode="inverse", outline=False):
     """The whole 72x16 frame as a Canvas, for the preview."""
     c = canvas.Canvas()
     c.blit(badge.quant, 0, 0)
-    colour = clock_colour(badge, hhmm, corner)
-    for (x, y), rgb in clock_cells(hhmm, corner, colour, outline).items():
+    glyphs = clock_colours(badge, hhmm, corner, mode)
+    cells = clock_cells(hhmm, corner, (0, 0, 0), outline) if outline else {}
+    cells.update(glyphs)
+    for (x, y), rgb in cells.items():
         c.px(x, y, rgb)
     return c
