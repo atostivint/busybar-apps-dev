@@ -16,9 +16,14 @@ start.
   are **deleted** - flat background, padding and the gaps between letters score ~0 - so every
   remaining pixel is an original pixel and the 5 px button text stays sharp. The frame columns are
   never dropped. Result: 72x15, all 15 rows, 72 of the 80 columns (nothing meaningful is lost).
-- **The clock is drawn on the image**, without a plate: white 3x5 digits with a 1 px black outline.
-  The outline is what keeps it readable over a white, black or busy button, and it only paints the
-  glyphs and their neighbours, so the artwork shows through everywhere else.
+- **The clock is drawn on the image, transparent**: only its own glyphs are painted, everything else
+  is `none`, so the button shows through. The digits are black or white depending on the brightness of
+  the part of the button underneath (measured on the pixels the time will cover), which keeps the time
+  readable without a plate. `--clock-outline` adds a 1 px black halo around the glyphs for the busy
+  buttons where neither colour reads well.
+- **The wheel switches pictures**: turn it forward or back to step through the buttons (or click it to
+  go one forward); the automatic swap pauses for a full `--hold` after a manual pick. `--no-wheel`
+  turns the input off, and the app runs unchanged without the state stream.
 - **The clock walks the corners**: on each badge swap it moves one corner clockwise
   (`bottom-left` -> `bottom-right` -> `top-right` -> `top-left`), so the same part of the artwork is
   not hidden every time. `--clock` picks the starting corner, `--no-clock-cycle` parks it.
@@ -27,6 +32,11 @@ start.
   display glitch (dropped elements, 400 "elements number limit exceeded"), which is why there is no
   frame timer and no continuous redraw. The swap is a single hard cut, not a slide.
 
+## Controls
+
+The bar's wheel is read from its own state stream (`/api/status/ws`, see `controls.py`): turn it to
+step through the buttons, click it to go one forward. `--no-wheel` ignores it.
+
 ## Options
 
 | option | default | |
@@ -34,6 +44,8 @@ start.
 | `--hold` | 10 | seconds each button stays on screen (3-120) |
 | `--clock` | `bottom-left` | corner the clock starts in (`bottom-left`, `bottom-right`, `top-right`, `top-left`) |
 | `--clock-cycle` | on | move the clock one corner clockwise on every badge swap (`--no-clock-cycle` to park it) |
+| `--wheel` | on | turn the wheel (or click it) to change picture (`--no-wheel` to ignore it) |
+| `--clock-outline` | off | 1 px black halo around the clock digits |
 | `--shuffle` | on | shuffle the order at startup (`--no-shuffle` keeps filename order) |
 | `--start` | 0 | badge index to start on (with `--no-shuffle`) |
 | `--priority` | 60 | display priority 1-100 (the manager's variation priority overrides it) |
@@ -44,9 +56,10 @@ start.
 The badge is a single 72x15 `xpmbitmap` (`b0l`); `belt.py` keeps the split at 72 columns for badges
 wider than the display, but at the 72 px target only one element is emitted.
 
-The clock is a second, small `xpmbitmap` (`clock`, 19x7): white digits, black outline, and `none`
-everywhere else, so the button shows through the gaps. `layout.clock_at()` places it flush in one of
-the four corners; the app advances the corner on every swap.
+The clock is a second, small `xpmbitmap` (`clock`, 19x7): the digits only, `none` everywhere else, so
+the button shows through. `layout.clock_colour()` samples the button under the digits and picks black
+or white; `--clock-outline` adds the halo. `layout.clock_at()` places it flush in one of the four
+corners; the app advances the corner on every swap.
 
 Every draw sends the whole scene, button first and clock last, because the element order inside one
 draw is the z-order and a single element sent on its own can land behind the others. The elements keep

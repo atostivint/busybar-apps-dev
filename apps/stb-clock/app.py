@@ -10,8 +10,9 @@ The manager starts the app with --host 127.0.0.1:8321 and proxies to the bar.
 The front display is 72x16, so an 80x15 button is fitted to 72x15 and drawn at the top: the whole
 button is visible and fills almost the whole screen. Resampling would turn the 5 px button text into
 grey mush, so each badge is reduced to 32 colours first, resized, then snapped back to that palette:
-flat areas stay flat and the strokes stay sharp. The time is drawn on top of the image, bottom-left,
-as white 3x5 digits with a 1 px black outline, readable on any button.
+flat areas stay flat and the strokes stay sharp. The time is drawn on top of the image, only its own pixels:
+black or white 3x5 digits, whichever contrasts with the part of the button underneath, so nothing
+around the clock is painted.
 
 Draws are rare on purpose: one when the badge swaps (a hard cut, no sliding, no animation) and one
 at each minute boundary, when the clock text changes. A draw costs the bar ~40-110 ms and frequent
@@ -31,6 +32,7 @@ from pathlib import Path
 
 import belt
 import layout
+from controls import Controls
 
 APP = "stb-clock"
 HERE = Path(__file__).resolve().parent
@@ -44,6 +46,10 @@ def args():
                    help="corner the clock starts in (bottom-left)")
     p.add_argument("--clock-cycle", action=argparse.BooleanOptionalAction, default=True,
                    help="move the clock to the next corner clockwise on every badge swap")
+    p.add_argument("--wheel", action=argparse.BooleanOptionalAction, default=True,
+                   help="turn the wheel (or click it) to switch to another button")
+    p.add_argument("--clock-outline", action=argparse.BooleanOptionalAction, default=False,
+                   help="1 px black outline around the clock digits (for busy buttons)")
     p.add_argument("--start", type=int, default=0, help="badge index to start on")
     p.add_argument("--shuffle", action=argparse.BooleanOptionalAction, default=True,
                    help="shuffle the order at startup (--no-shuffle keeps filename order)")
@@ -110,8 +116,11 @@ def main():
     hold = max(3, min(120, a.hold))
     corner = a.clock
 
+    controls = Controls(base) if a.wheel else None
+
     print(f"{n} badges at {badges[0].w}x{badges[0].h}, hold {hold} s, clock {corner}"
-          f"{' (cycling)' if a.clock_cycle else ''}, start {badges[index].name}", flush=True)
+          f"{' (cycling)' if a.clock_cycle else ''}, "
+          f"{'wheel on' if controls else 'wheel off'}, start {badges[index].name}", flush=True)
     clear(base)
 
     # Swap times follow the monotonic clock so a slow draw cannot accumulate drift; the minute
@@ -131,21 +140,33 @@ def main():
 
         wall = time.time()
         hhmm = time.strftime("%H:%M", time.localtime(wall))
-        els = layout.elements(badges[index], index, hhmm, corner)
+        els = layout.elements(badges[index], index, hhmm, corner, a.clock_outline)
         draw(base, els, a.priority)
 
         if hhmm != last_hhmm:
             print(time.strftime("%Y-%m-%d %H:%M", time.localtime(wall)), flush=True)
             last_hhmm = hhmm
 
-        # Sleep until the next badge swap or the next minute boundary. If the draw itself straddled
-        # the boundary, the digits on the bar are a minute old: wake at once and draw again.
+        # Wait for the next badge swap, the next minute boundary, or the wheel. If the draw itself
+        # straddled the boundary, the digits on the bar are a minute old: wake at once and draw again.
         wall = time.time()
         if time.strftime("%H:%M", time.localtime(wall)) != hhmm:
             wait = 0.05
         else:
             wait = 60.05 - (wall % 60.0)
-        time.sleep(max(0.05, min(swap_due - time.monotonic(), wait)))
+        timeout = max(0.05, min(swap_due - time.monotonic(), wait))
+        if controls is None:
+            time.sleep(timeout)
+            turned = False
+        else:
+            turned = controls.wait(timeout)
+        if turned:
+            steps, clicks = controls.take()
+            if steps or clicks:
+                index = (index + steps + (1 if clicks else 0)) % n
+                if a.clock_cycle:
+                    corner = layout.next_corner(corner)
+                swap_due = time.monotonic() + hold      # the manual pick gets a full hold
 
 
 if __name__ == "__main__":

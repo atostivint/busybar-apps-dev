@@ -36,6 +36,8 @@ def main():
                    help="corner the clock starts in (bottom-left)")
     p.add_argument("--clock-cycle", action=argparse.BooleanOptionalAction, default=True,
                    help="move the clock to the next corner on every frame")
+    p.add_argument("--clock-outline", action=argparse.BooleanOptionalAction, default=False,
+                   help="1 px black outline around the clock digits")
     p.add_argument("--start", type=int, default=0, help="badge index to start on")
     p.add_argument("--time", default=time.strftime("%H:%M"), help="HH:MM to show")
     p.add_argument("--scale", type=int, default=6, help="pixel size in the images (default 6)")
@@ -60,14 +62,14 @@ def main():
         return layout.next_corner(a.clock, step) if a.clock_cycle else a.clock
 
     first = badges[start]
-    image(layout.frame_canvas(first, hhmm, corner_for(0)), scale).save(out.with_suffix(".png"))
+    image(layout.frame_canvas(first, hhmm, corner_for(0), a.clock_outline), scale).save(out.with_suffix(".png"))
 
     count = max(1, min(n, a.count))
     frames, names = [], []
     for k in range(count):
         badge = badges[(start + k) % n]
         names.append(badge.name)
-        frame = layout.frame_canvas(badge, hhmm, corner_for(k))
+        frame = layout.frame_canvas(badge, hhmm, corner_for(k), a.clock_outline)
         frames.append(image(frame, scale).convert("P", palette=Image.ADAPTIVE, colors=64))
     frames[0].save(out.with_suffix(".gif"), save_all=True, append_images=frames[1:],
                    duration=1000, loop=0, optimize=True)
