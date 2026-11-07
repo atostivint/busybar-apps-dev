@@ -9,8 +9,8 @@ on their own.
 ![Steal These Buttons on the BUSY Bar](apps/stb-clock/preview.gif)
 
 One whole classic 80×15 web button at a time (`apps/stb-clock`), from the
-[Steal These Buttons](https://taylor.fyi/buttons/) collection, swapped every 10 seconds with a hard
-cut. The time is white 3×5 digits with a 1 px black outline, drawn straight on the artwork, and it
+[Steal These Buttons](https://taylor.fyi/buttons/) collection (downloaded into a local cache on the
+first start, no images in this repo), swapped every 10 seconds with a hard cut. The time is white 3×5 digits with a 1 px black outline, drawn straight on the artwork, and it
 moves to the next corner on every swap so it never hides the same part of the button.
 
 - The 80 px badge does not fit the 72 px screen, and scaling smears its 1 px glyph strokes, so the 8
@@ -26,8 +26,8 @@ moves to the next corner on every swap so it never hides the same part of the bu
     python apps/stb-clock/app.py --host 10.0.4.20      # or enable it in the manager
     python apps/stb-clock/app.py --hold 30 --no-clock-cycle
 
-`apps/stb-clock/README.md` has the options and how to add your own buttons (the buttons belong to
-their authors; the app only reads the copy in `apps/stb-clock/assets/buttons`).
+`apps/stb-clock/README.md` has the options and how to add your own button names. The buttons belong
+to their authors: the repo only carries the list, and the app caches what it downloads.
 
 ## Halloween Clock
 

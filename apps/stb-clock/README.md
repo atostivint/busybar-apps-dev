@@ -4,10 +4,12 @@ One whole classic web button at a time on the BUSY Bar's front display, with the
 on top of it. Every `--hold` seconds the button is swapped for the next one with a hard cut: no
 sliding, no fading, no animation.
 
-The buttons come from the [Steal These Buttons](https://taylor.fyi/buttons/) collection. 111 files sit
-in `assets/buttons/`, but some buttons are there twice as `name.gif` and `name.png`; only one file per
-button is kept (animated GIF > PNG > GIF), so the rotation is 85 different buttons, shuffled at every
-start.
+The buttons come from the [Steal These Buttons](https://taylor.fyi/buttons/) collection. **No button
+image is stored in this repository**: `assets/buttons.txt` lists the 85 wanted file names, and on the
+first start the app downloads the missing ones into `cache/buttons/` (git-ignored). The cache is kept
+between runs and works offline; delete the folder to fetch everything again. Some buttons exist twice
+as `name.gif` and `name.png`; only one file per button is used (animated GIF > GIF > PNG), and the
+order is shuffled at every start.
 
 ## The frame
 
@@ -80,6 +82,9 @@ draw is the z-order and a single element sent on its own can land behind the oth
 the same ids across swaps, so a new button replaces the old one on the bar instead of stacking on top
 of it: an element stays on screen until its id is overwritten or cleared.
 
+`source.py` does the caching: `ensure()` downloads only what is missing, logs a line every 20 files
+and skips a failed download instead of failing the app (the cache then serves what it has).
+
 At startup the app deletes its own elements (`DELETE /api/display/draw`): on Windows the manager
 hard-kills apps, so nothing at shutdown ever runs. The manager starts the app with `--host` pointing
 at its proxy.
@@ -90,12 +95,11 @@ elements.
 
 ## Adding buttons
 
-Drop images into `assets/buttons/` - any GIF/PNG, flat or animated (only the first frame is used).
-Everything is fitted to 72x15 once at startup, so 80x15 files look best: only 8 redundant columns
-are dropped and nothing is scaled.
-`tools/fetch_buttons.py` downloads the curated wishlist from taylor.fyi/buttons: `--all` gets
-everything on the page, `--list names.txt` gets your own list (names without extension). Restart the
-app to pick up new files.
+Add the file name (with its extension) to `assets/buttons.txt` and restart: the app downloads it on
+startup. To look at the collection first, `python tools/fetch_buttons.py --all` fills the cache with
+every image the page lists (it needs the site's index, so it takes a while). `--list mine.txt` fetches
+your own list. Images are any GIF/PNG; only the first frame of an animated one is used, and every
+button is fitted to 72x15 at load, so 80x15 files look best.
 
 ## Preview
 

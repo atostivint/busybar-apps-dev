@@ -20,8 +20,10 @@ from PIL import Image
 
 import belt
 import layout
+import source
 
 HERE = Path(__file__).resolve().parent.parent
+CACHE = HERE / "cache" / "buttons"
 
 
 def image(c, scale):
@@ -32,14 +34,14 @@ def image(c, scale):
 def main():
     p = argparse.ArgumentParser(description="One whole classic web button at a time, with the time")
     p.add_argument("--hold", type=int, default=10, help="seconds each button stays on screen")
-    p.add_argument("--clock", default="bottom-left", choices=layout.CORNERS,
-                   help="corner the clock starts in (bottom-left)")
-    p.add_argument("--cycle", default="on", choices=("on", "off"),
-                   help="move the clock corner each frame")
+    p.add_argument("--clock", default="auto", choices=("auto",) + layout.CORNERS,
+                   help="clock corner: auto = emptiest readable spot")
     p.add_argument("--outline", default="off", choices=("on", "off"),
-                   help="black halo around the digits")
-    p.add_argument("--clock-color", default="inverse", choices=("inverse", "auto"),
-                   help="digit colour: inverse or black/white")
+                   help="force the halo around the digits")
+    p.add_argument("--clock-color", default="auto", choices=("inverse", "auto"),
+                   help="digit colour: black/white or inverse")
+    p.add_argument("--clock-style", default="filled", choices=("filled", "outline"),
+                   help="digits: filled or hollow outline")
     p.add_argument("--start", type=int, default=0, help="badge index to start on")
     p.add_argument("--time", default=time.strftime("%H:%M"), help="HH:MM to show")
     p.add_argument("--scale", type=int, default=6, help="pixel size in the images (default 6)")
@@ -52,9 +54,10 @@ def main():
         sys.exit(f"--time must be HH:MM, got {a.time!r}")
     hhmm = f"{hh:02d}:{mm:02d}"
 
-    badges = belt.load(HERE / "assets" / "buttons")
+    source.ensure(CACHE, source.names(HERE / "assets" / "buttons.txt"))
+    badges = belt.load(CACHE)
     if not badges:
-        sys.exit("no badges in assets/buttons (run tools/fetch_buttons.py)")
+        sys.exit("no usable buttons in cache/buttons")
     n = len(badges)
     start = max(0, min(n - 1, a.start))
     scale = max(1, a.scale)

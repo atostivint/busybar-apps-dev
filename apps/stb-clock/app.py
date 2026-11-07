@@ -7,6 +7,9 @@
 
 The manager starts the app with --host 127.0.0.1:8321 and proxies to the bar.
 
+The button images are not in this repository: assets/buttons.txt lists what the app wants and the
+first start downloads them into cache/buttons/ (kept between runs, works offline).
+
 The front display is 72x16, so an 80x15 button is fitted to 72x15 and drawn at the top: the whole
 button is visible and fills almost the whole screen. Resampling would turn the 5 px button text into
 grey mush, so each badge is reduced to 32 colours first, resized, then snapped back to that palette:
@@ -32,10 +35,12 @@ from pathlib import Path
 
 import belt
 import layout
+import source
 from controls import Controls
 
 APP = "stb-clock"
 HERE = Path(__file__).resolve().parent
+CACHE = HERE / "cache" / "buttons"
 
 
 def args():
@@ -108,9 +113,13 @@ def main():
     base = "http://" + a.host.replace("http://", "").rstrip("/")
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
-    badges = belt.load(HERE / "assets" / "buttons")
+    wanted = source.names(HERE / "assets" / "buttons.txt")
+    folder, have, failed = source.ensure(CACHE, wanted)
+    if not have:
+        sys.exit("no buttons: the download failed and cache/buttons is empty")
+    badges = belt.load(folder)
     if not badges:
-        sys.exit("no badges in assets/buttons (run tools/fetch_buttons.py)")
+        sys.exit("no usable buttons in cache/buttons")
     if a.shuffle == "on":
         random.shuffle(badges)
     n = len(badges)
@@ -120,7 +129,8 @@ def main():
 
     controls = Controls(base) if a.wheel == "on" else None
 
-    print(f"{n} badges at {badges[0].w}x{badges[0].h}, hold {hold} s, clock {a.clock}"
+    print(f"{n} badges at {badges[0].w}x{badges[0].h} ({len(have)} cached, {len(failed)} failed), "
+          f"hold {hold} s, clock {a.clock}"
           f", "
           f"{'wheel on' if controls else 'wheel off'}, start {badges[index].name}", flush=True)
     clear(base)
