@@ -30,11 +30,20 @@ def clock_size(hhmm="00:00"):
     return w + 2, 5 + 2
 
 
-def clock_at(corner, hhmm="00:00"):
-    """(x, y) of the clock element: flush with the screen edges in the chosen corner."""
+def clock_at(corner, hhmm="00:00", align="default"):
+    """(x, y) of the clock element in the chosen corner, nudged by `align`.
+
+    The element carries 1 px of halo, so at `default` the digits sit 1 px inside the screen edge.
+    `flush` pushes the box outward so the digits touch the border (the halo is clipped there) and
+    `inset` pulls it in so the digits line up with the button's inner white line.
+    """
     w, h = clock_size(hhmm)
     x = 0 if "left" in corner else canvas.W - w
     y = 0 if "top" in corner else canvas.H - h
+    if align == "flush":
+        x += -1 if "left" in corner else 1
+    elif align == "inset":
+        x += 1 if "left" in corner else -1
     return x, y
 
 
@@ -65,10 +74,10 @@ def busy_score(badge, corner, hhmm="00:00"):
     return e
 
 
-def _covered(badge, corner, hhmm="00:00"):
+def _covered(badge, corner, hhmm="00:00", align="default"):
     """The luminance of the button pixels the digits would cover."""
     px = badge.quant.load()
-    return [_lum(px[x, y]) for (x, y) in clock_cells(hhmm, corner, None, False)
+    return [_lum(px[x, y]) for (x, y) in clock_cells(hhmm, corner, None, False, align)
             if 0 <= x < canvas.W and 0 <= y < badge.h]
 
 
@@ -82,9 +91,9 @@ def _pick_ink(vals):
     return (best[1], best[1], best[1])
 
 
-def bad_fraction(badge, corner, hhmm="00:00"):
+def bad_fraction(badge, corner, hhmm="00:00", align="default"):
     """Share of the glyph pixels that would be hard to see there with the best of black and white."""
-    vals = _covered(badge, corner, hhmm)
+    vals = _covered(badge, corner, hhmm, align)
     if not vals:
         return 1.0
     ink = _lum(_pick_ink(vals))
@@ -109,14 +118,23 @@ def choose_corner(badge, hhmm="00:00", previous=None):
     return order[0]
 
 
-def needs_outline(badge, corner, hhmm="00:00"):
+def needs_outline(badge, corner, hhmm="00:00", align="default"):
     """True when some digits would be hard to see: a 1 px halo fixes exactly those pixels."""
-    return bad_fraction(badge, corner, hhmm) > OUTLINE_ABOVE
+    return bad_fraction(badge, corner, hhmm, align) > OUTLINE_ABOVE
 
 
-def needs_plate(badge, corner, hhmm="00:00"):
+def needs_plate(badge, corner, hhmm="00:00", align="default"):
     """True for the photo-like buttons, where no corner and no halo leaves the digits readable."""
-    return bad_fraction(badge, corner, hhmm) > PLATE_ABOVE
+    return bad_fraction(badge, corner, hhmm, align) > PLATE_ABOVE
+
+
+def choose_align(badge, corner, hhmm="00:00"):
+    """Flush against the border when the digits stay readable there, else the default, else inset."""
+    bad = {a: bad_fraction(badge, corner, hhmm, a) for a in ("flush", "default", "inset")}
+    for a in ("flush", "default", "inset"):
+        if bad[a] <= 0.05:
+            return a
+    return min(bad, key=bad.get)
 
 
 def _lum(rgb):
@@ -131,7 +149,7 @@ def _inverse(bg):
     return inv
 
 
-def clock_colours(badge, hhmm, corner="bottom-left", mode="inverse"):
+def clock_colours(badge, hhmm, corner="bottom-left", mode="inverse", align="default"):
     """One colour for the whole clock: the inverse of the button under it, or black/white.
 
     One colour for all glyphs, not one per pixel: inverting each pixel separately turns the digits
@@ -139,13 +157,13 @@ def clock_colours(badge, hhmm, corner="bottom-left", mode="inverse"):
     """
     total = [0, 0, 0]
     lum = []
-    for (x, y) in clock_cells(hhmm, corner, None, False):
+    for (x, y) in clock_cells(hhmm, corner, None, False, align):
         if 0 <= x < canvas.W and 0 <= y < badge.h:
             bg = badge.quant.getpixel((x, y))
             for i in range(3):
                 total[i] += bg[i]
             lum.append(_lum(bg))
-    pixels = clock_cells(hhmm, corner, None, False)
+    pixels = clock_cells(hhmm, corner, None, False, align)
     if not lum:
         return {p: (255, 255, 255) for p in pixels}
     if mode == "inverse":
@@ -154,13 +172,13 @@ def clock_colours(badge, hhmm, corner="bottom-left", mode="inverse"):
     return {p: _pick_ink(lum) for p in pixels}
 
 
-def clock_cells(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=False):
+def clock_cells(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=False, align="default"):
     """{(screen x, screen y): colour} for the digits (and outline); nothing else is painted.
 
     `colour=None` only marks the glyph pixels (the value is a placeholder): clock_colours() uses it to
     know which background pixels the time will cover.
     """
-    x, y = clock_at(corner, hhmm)
+    x, y = clock_at(corner, hhmm, align)
     cells = {}
     cx = x + 1                                  # 1 px of outline on the left
     for ch in hhmm:
@@ -182,11 +200,12 @@ def clock_cells(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=Fals
     return {**ring, **cells}
 
 
-def clock_element(badge, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False):
+def clock_element(badge, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False,
+                  align="default"):
     """The clock as one xpmbitmap element: digits only, everything else transparent (or a solid plate)."""
     w, h = clock_size(hhmm)
-    x, y = clock_at(corner, hhmm)
-    glyphs = clock_colours(badge, hhmm, corner, mode)
+    x, y = clock_at(corner, hhmm, align)
+    glyphs = clock_colours(badge, hhmm, corner, mode, align)
     if plate:                                # photo-like button: white digits on solid black
         return _xpm_element(w, h, x, y,
                             {(xx, yy): (0, 0, 0) for yy in range(y, y + h) for xx in range(x, x + w)}
@@ -230,20 +249,22 @@ def _xpm_element(w, h, x, y, cells):
             "data": head + "\n".join(rows) + "\n"}
 
 
-def elements(badge, index, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False):
+def elements(badge, index, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False,
+             align="default"):
     """The draw list: the badge, then the clock on top."""
     els = badge.elements(0, 0, 0, "")
-    els.append(clock_element(badge, hhmm, corner, mode, outline, plate))
+    els.append(clock_element(badge, hhmm, corner, mode, outline, plate, align))
     return els
 
 
-def frame_canvas(badge, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False):
+def frame_canvas(badge, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False,
+                 align="default"):
     """The whole 72x16 frame as a Canvas, for the preview."""
     c = canvas.Canvas()
     c.blit(badge.quant, 0, 0)
-    glyphs = clock_colours(badge, hhmm, corner, mode)
+    glyphs = clock_colours(badge, hhmm, corner, mode, align)
     if plate:
-        x, y = clock_at(corner, hhmm)
+        x, y = clock_at(corner, hhmm, align)
         w, h = clock_size(hhmm)
         c.rect(x, y, w, h, (0, 0, 0))
         for (px, py) in glyphs:

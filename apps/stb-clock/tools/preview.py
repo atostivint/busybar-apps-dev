@@ -70,9 +70,10 @@ def main():
 
     def render(badge):
         corner = corner_for(badge)
-        plate = layout.needs_plate(badge, corner, hhmm)
-        outline = not plate and (a.outline == "on" or layout.needs_outline(badge, corner, hhmm))
-        return layout.frame_canvas(badge, hhmm, corner, a.clock_color, outline, plate)
+        align = layout.choose_align(badge, corner, hhmm)
+        plate = layout.needs_plate(badge, corner, hhmm, align)
+        outline = not plate and (a.outline == "on" or layout.needs_outline(badge, corner, hhmm, align))
+        return layout.frame_canvas(badge, hhmm, corner, a.clock_color, outline, plate, align)
 
     first = badges[start]
     image(render(first), scale).save(out.with_suffix(".png"))

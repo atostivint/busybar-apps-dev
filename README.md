@@ -19,8 +19,8 @@ moves to the next corner on every swap so it never hides the same part of the bu
 - 85 buttons (the `.gif`/`.png` twins of the same button are collapsed), shuffled at every start.
 - **Turn the wheel** to step through them, click it to go one forward.
 - The clock is transparent (black or white digits only) and picks the corner where it can be read
-  and covers the least artwork; a 1 px halo, or a small plate on photo-like buttons, appears only
-  when the art leaves no other way.
+  and covers the least artwork, flush against the button's border; a 1 px halo, or a small plate on
+  photo-like buttons, appears only when the art leaves no other way.
 - Two elements and two draws per minute plus one per swap: the bar costs 40–110 ms per draw.
 
     python apps/stb-clock/app.py --host 10.0.4.20      # or enable it in the manager

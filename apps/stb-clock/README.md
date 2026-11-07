@@ -24,6 +24,10 @@ start.
   background ~0, text and logos high). A 15 % busyness nudge keeps it moving from button to button
   instead of parking on the same empty spot for 60 of the 85 buttons. `--clock bottom-left` (etc.)
   pins one corner.
+- **Flush against the border**: `choose_align()` pushes the time outward so the digits touch the
+  button's frame (the halo is clipped on that side). If that would put more than 5 % of the digits
+  under a hard-to-read contrast, it backs off 1 px (the old default) or 2 px to line up with the
+  button's inner white line - the clock only keeps its distance when the artwork demands it.
 - **Two small fallbacks, only when the art leaves no choice**: if a few digits are still hard to see
   (3 of 85 buttons) the clock gets a 1 px halo in the opposite colour; if the button is a busy photo
   where no corner is clear (1 of 85, The Beatles), it gets a small solid black plate. Everything else
@@ -63,8 +67,9 @@ wider than the display, but at the 72 px target only one element is emitted.
 The clock is a second, small `xpmbitmap` (`clock`, 19x7): the digits only, `none` everywhere else, so
 the button shows through. `layout.clock_colours()` samples the button under the digits and returns one
 colour (the inverse, or black/white); `--outline on` adds the halo. `layout.choose_corner()` picks the corner (readable first,
-then emptiest), `layout.needs_outline()` / `layout.needs_plate()` decide the fallbacks, and
-`layout.clock_at()` places the element flush in that corner.
+then emptiest), `layout.choose_align()` nudges the element flush against the border (or 1-2 px in when
+needed), `layout.needs_outline()` / `layout.needs_plate()` decide the fallbacks, and
+`layout.clock_at()` places the element.
 
 Every draw sends the whole scene, button first and clock last, because the element order inside one
 draw is the z-order and a single element sent on its own can land behind the others. The elements keep

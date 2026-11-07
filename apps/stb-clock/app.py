@@ -144,9 +144,10 @@ def main():
             corner = layout.choose_corner(badges[index], hhmm, corner)
             pick_corner = False
         badge = badges[index]
-        plate = layout.needs_plate(badge, corner, hhmm)
-        outline = not plate and (a.outline == "on" or layout.needs_outline(badge, corner, hhmm))
-        els = layout.elements(badge, index, hhmm, corner, a.clock_color, outline, plate)
+        align = layout.choose_align(badge, corner, hhmm)
+        plate = layout.needs_plate(badge, corner, hhmm, align)
+        outline = not plate and (a.outline == "on" or layout.needs_outline(badge, corner, hhmm, align))
+        els = layout.elements(badge, index, hhmm, corner, a.clock_color, outline, plate, align)
         draw(base, els, a.priority)
 
         if hhmm != last_hhmm:
