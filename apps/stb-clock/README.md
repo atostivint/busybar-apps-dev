@@ -28,6 +28,9 @@ start.
   button's frame (the halo is clipped on that side). If that would put more than 5 % of the digits
   under a hard-to-read contrast, it backs off 1 px (the old default) or 2 px to line up with the
   button's inner white line - the clock only keeps its distance when the artwork demands it.
+- **Hollow option**: `--clock-style outline` paints only the 1 px halo, so the button shows through
+  the strokes. It looks lighter and more "engraved", but reads less well than filled digits on busy
+  or bright buttons; filled is the default for that reason.
 - **Two small fallbacks, only when the art leaves no choice**: if a few digits are still hard to see
   (3 of 85 buttons) the clock gets a 1 px halo in the opposite colour; if the button is a busy photo
   where no corner is clear (1 of 85, The Beatles), it gets a small solid black plate. Everything else
@@ -54,6 +57,7 @@ step through the buttons, click it to go one forward. `--no-wheel` ignores it.
 | `--wheel` | `on` | turn the wheel (or click it) to change picture (`off` ignores it) |
 | `--outline` | `off` | force the 1 px halo (it is added automatically when needed) |
 | `--clock-color` | `auto` | digit colour: `auto` black/white, or `inverse` of the button under the digits |
+| `--clock-style` | `filled` | `filled` digits, or `outline` (hollow: only the halo is painted, the artwork shows inside the strokes) |
 | `--shuffle` | `on` | shuffle the order at start (`off` keeps filename order) |
 | `--start` | 0 | badge index to start on (with `--no-shuffle`) |
 | `--priority` | 60 | display priority 1-100 (the manager's variation priority overrides it) |

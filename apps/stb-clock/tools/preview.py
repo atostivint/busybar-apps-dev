@@ -73,7 +73,8 @@ def main():
         align = layout.choose_align(badge, corner, hhmm)
         plate = layout.needs_plate(badge, corner, hhmm, align)
         outline = not plate and (a.outline == "on" or layout.needs_outline(badge, corner, hhmm, align))
-        return layout.frame_canvas(badge, hhmm, corner, a.clock_color, outline, plate, align)
+        return layout.frame_canvas(badge, hhmm, corner, a.clock_color, outline, plate, align,
+                                   a.clock_style)
 
     first = badges[start]
     image(render(first), scale).save(out.with_suffix(".png"))

@@ -201,7 +201,7 @@ def clock_cells(hhmm, corner="bottom-left", colour=(255, 255, 255), outline=Fals
 
 
 def clock_element(badge, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False,
-                  align="default"):
+                  align="default", style="filled"):
     """The clock as one xpmbitmap element: digits only, everything else transparent (or a solid plate)."""
     w, h = clock_size(hhmm)
     x, y = clock_at(corner, hhmm, align)
@@ -210,8 +210,29 @@ def clock_element(badge, hhmm, corner="bottom-left", mode="inverse", outline=Fal
         return _xpm_element(w, h, x, y,
                             {(xx, yy): (0, 0, 0) for yy in range(y, y + h) for xx in range(x, x + w)}
                             | {p: (255, 255, 255) for p in glyphs})
+    if style == "outline":                   # hollow digits: the halo only, the artwork inside
+        return _xpm_element(w, h, x, y, _ring(glyphs, _ring_ink(badge, hhmm, corner, align)))
     cells = _ringed(glyphs) if outline else glyphs
     return _xpm_element(w, h, x, y, cells)
+
+
+def _ring_ink(badge, hhmm, corner, align="default"):
+    """The colour for hollow digits: the one that contrasts with the pixels the halo covers."""
+    px = badge.quant.load()
+    vals = [_lum(px[x, y]) for (x, y) in clock_cells(hhmm, corner, None, False, align)
+            if 0 <= x < canvas.W and 0 <= y < badge.h]
+    return _pick_ink(vals)
+
+
+def _ring(glyphs, halo):
+    """Only the 1 px halo around the digits, leaving the glyph pixels unpainted."""
+    cells = {}
+    for (x, y) in glyphs:
+        for dx, dy in NEIGHBOURS:
+            p = (x + dx, y + dy)
+            if p not in glyphs and 0 <= p[0] < canvas.W and 0 <= p[1] < canvas.H:
+                cells[p] = halo
+    return cells
 
 
 def _ringed(glyphs):
@@ -250,15 +271,15 @@ def _xpm_element(w, h, x, y, cells):
 
 
 def elements(badge, index, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False,
-             align="default"):
+             align="default", style="filled"):
     """The draw list: the badge, then the clock on top."""
     els = badge.elements(0, 0, 0, "")
-    els.append(clock_element(badge, hhmm, corner, mode, outline, plate, align))
+    els.append(clock_element(badge, hhmm, corner, mode, outline, plate, align, style))
     return els
 
 
 def frame_canvas(badge, hhmm, corner="bottom-left", mode="inverse", outline=False, plate=False,
-                 align="default"):
+                 align="default", style="filled"):
     """The whole 72x16 frame as a Canvas, for the preview."""
     c = canvas.Canvas()
     c.blit(badge.quant, 0, 0)
@@ -270,6 +291,8 @@ def frame_canvas(badge, hhmm, corner="bottom-left", mode="inverse", outline=Fals
         for (px, py) in glyphs:
             c.px(px, py, (255, 255, 255))
         return c
-    for (x, y), rgb in (_ringed(glyphs) if outline else glyphs).items():
+    cells = (_ring(glyphs, _ring_ink(badge, hhmm, corner, align)) if style == "outline"
+             else _ringed(glyphs) if outline else glyphs)
+    for (x, y), rgb in cells.items():
         c.px(x, y, rgb)
     return c

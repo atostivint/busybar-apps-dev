@@ -50,6 +50,8 @@ def args():
                    help="black halo around the digits")
     p.add_argument("--clock-color", default="auto", choices=("inverse", "auto"),
                    help="digit colour: black/white or inverse")
+    p.add_argument("--clock-style", default="filled", choices=("filled", "outline"),
+                   help="digits: filled, or hollow outline")
     p.add_argument("--start", type=int, default=0, help="badge index to start on")
     p.add_argument("--shuffle", default="on", choices=("on", "off"),
                    help="shuffle the order at start")
@@ -147,7 +149,8 @@ def main():
         align = layout.choose_align(badge, corner, hhmm)
         plate = layout.needs_plate(badge, corner, hhmm, align)
         outline = not plate and (a.outline == "on" or layout.needs_outline(badge, corner, hhmm, align))
-        els = layout.elements(badge, index, hhmm, corner, a.clock_color, outline, plate, align)
+        els = layout.elements(badge, index, hhmm, corner, a.clock_color, outline, plate, align,
+                              a.clock_style)
         draw(base, els, a.priority)
 
         if hhmm != last_hhmm:
