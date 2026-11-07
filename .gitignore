@@ -9,3 +9,5 @@ apps/prochain-ter/cache/
 apps/prochain-ter/drive_times.json
 apps/prochain-ter/tomtom.key
 apps/stb-clock/cache/
+# Windows folder icon, local only: the file attributes it needs do not survive a clone
+desktop.ini

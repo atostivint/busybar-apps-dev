@@ -148,7 +148,7 @@ def draw_bar(canvas, cx, cy, width, ss):
     canvas.alpha_composite(hot_layer)
 
 
-def logo(size=1024, ss=3):
+def logo(size=1024, ss=3, bar=0.80, cy=0.505, halo_strength=0.55):
     W = size * ss
     canvas = Image.new("RGBA", (W, W), (0, 0, 0, 0))
     canvas.alpha_composite(_vgrad(W, W, BG_TOP, BG_BOTTOM).convert("RGBA"))
@@ -156,14 +156,14 @@ def logo(size=1024, ss=3):
     # warm halo behind the bar
     halo = Image.new("L", (W, W), 0)
     halo.paste(_radial(round(W * 0.85), round(W * 0.80), 90), (round(W * 0.075), round(W * 0.12)))
-    _glow(canvas, halo, ORANGE, W * 0.03, 0.55)
+    _glow(canvas, halo, ORANGE, W * 0.03, halo_strength)
 
     # soft contact shadow
     sh = Image.new("L", (W, W), 0)
     ImageDraw.Draw(sh).ellipse((W * 0.14, W * 0.66, W * 0.86, W * 0.80), fill=150)
     _glow(canvas, sh, (0, 0, 0), W * 0.03, 1.0)
 
-    draw_bar(canvas, size / 2, size * 0.505, size * 0.80, ss)
+    draw_bar(canvas, size / 2, size * cy, size * bar, ss)
 
     # rounded icon tile
     mask = Image.new("L", (W, W), 0)
@@ -225,8 +225,53 @@ def banner(w=1600, h=420, ss=2):
     return canvas.resize((w, h), Image.LANCZOS)
 
 
+def _write_ico(path, images):
+    """Write a multi-size .ico holding each image as a PNG entry (Vista+). Pillow's own
+    writer resamples one image; here every size is drawn (or downscaled) on its own."""
+    import io
+    import struct
+
+    blobs, entries = [], []
+    offset = 6 + 16 * len(images)
+    for im in images:
+        buf = io.BytesIO()
+        im.save(buf, "PNG", optimize=True)
+        data = buf.getvalue()
+        side = im.width if im.width < 256 else 0
+        entries.append(struct.pack("<BBBBHHII", side, side, 0, 0, 1, 32, len(data), offset))
+        offset += len(data)
+        blobs.append(data)
+    with open(path, "wb") as f:
+        f.write(struct.pack("<HHH", 0, 1, len(images)))
+        for entry in entries:
+            f.write(entry)
+        for data in blobs:
+            f.write(data)
+
+
+def icons():
+    """The icon set: Windows .ico, PNGs for web/READMEs, .icns for macOS.
+
+    Small sizes get a tighter crop (the bar fills more of the square) so the white
+    body and its lit screen still read at 16 px."""
+    folder = os.path.join(OUT, "icons")
+    os.makedirs(folder, exist_ok=True)
+    base = logo(1024, bar=0.90, cy=0.50, halo_strength=0.40)
+    sizes = (16, 24, 32, 48, 64, 96, 128, 256, 512)
+    imgs = {s: base.resize((s, s), Image.LANCZOS) for s in sizes}
+    for s in (16, 32, 48, 96, 256, 512):
+        imgs[s].save(os.path.join(folder, f"icon-{s}.png"), optimize=True)
+    _write_ico(os.path.join(folder, "icon.ico"), [imgs[s] for s in (16, 24, 32, 48, 64, 128, 256)])
+    try:
+        imgs[512].save(os.path.join(folder, "icon.icns"), format="ICNS")
+    except Exception as exc:  # Pillow without an icns writer: the .ico and PNGs still work
+        print("no icns:", exc)
+    return folder
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     logo().save(os.path.join(OUT, "logo.png"))
     banner().save(os.path.join(OUT, "banner.png"))
-    print("wrote docs/logo.png and docs/banner.png")
+    folder = icons()
+    print("wrote docs/logo.png, docs/banner.png,", os.path.relpath(folder).replace("\\", "/") + "/")

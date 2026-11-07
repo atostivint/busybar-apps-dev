@@ -130,5 +130,7 @@ quirks, upload timeouts, how the charge animations are generated, and how to ver
 capturing the real screen.
 
 The logo is drawn the same way, not hand-drawn: `python tools/gen_logo.py` regenerates
-`docs/logo.png` (the square avatar) and `docs/banner.png` (the banner above) from the bar's real
-proportions, its LED pitch and its "BUSY" wordmark set in the 3×5 pixel font.
+`docs/logo.png` (the square avatar), `docs/banner.png` (the banner above) and `docs/icons/`
+(`icon.ico` with 16-256 px entries, PNGs from 16 to 512, `.icns` for macOS) from the bar's real
+proportions, its LED pitch and its "BUSY" wordmark set in the 3×5 pixel font. Small sizes are
+drawn with a tighter crop so the lit screen still reads at 16 px.
