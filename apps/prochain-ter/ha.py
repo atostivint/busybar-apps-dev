@@ -21,7 +21,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
 
-TIMEOUT_S = 5
+TIMEOUT_S = 12  # HA's event loop can stall for several seconds: a 5 s budget lost whole polls
 E_TRAIN = "sensor.ter_prochain_train"
 E_PHASE = "sensor.ter_phase"
 E_DEPART = "sensor.ter_heure_de_depart"
