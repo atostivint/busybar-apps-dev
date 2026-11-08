@@ -65,7 +65,7 @@ class HomeAssistant(unittest.TestCase):
         self.assertEqual(ha.timings(s), (5, 14))
         req, timeout = seen[0]
         self.assertEqual(req.get_header("Authorization"), f"Bearer {TOKEN}")
-        self.assertEqual(timeout, 5)
+        self.assertEqual(timeout, ha.TIMEOUT_S)
 
     def test_maps_onto_the_internal_model(self):
         with mock.patch("urllib.request.urlopen", fake_urlopen(payloads())):

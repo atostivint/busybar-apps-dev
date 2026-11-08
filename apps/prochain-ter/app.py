@@ -288,7 +288,10 @@ def main():
                 # HA's board follows HA's own clock window: when the location says the other way, use GTFS
                 # (outside the clock windows HA's sensor serves no window either: GTFS too)
                 if ha_state is not None and direction == win.direction and not by_location:
-                    ha_deps = ha.departures(ha_state)
+                    # An inactive answer ("off") means HA has no train to announce, not that there is
+                    # no train: the timetable stays GTFS's job. Leaving ha_deps None lets GTFS answer
+                    # instead of letting a quiet or stale HA package blank the bar.
+                    ha_deps = ha.departures(ha_state) if ha_state.get("active") else None
             try:
                 if clock or ha_deps is not None:
                     pass
