@@ -202,9 +202,11 @@ def next_train(theme, next_dep=None, next_go=None, drive=None):
 
 
 def clock(theme, hhmm, destination):
-    """The current time (desk clock)."""
+    """The desk clock: the current time at the very top left, the destination under it, the TER logo
+    on the right (it used to sit in the left block, which pushed the time into the middle)."""
     th = THEMES[theme]
-    return _badge(th, th["block"], th["on_block"], hhmm, destination[:7], th["fg"], th["sub"])
+    return _base(th) + [_text("a", hhmm, 1, -1, th["fg"]), _text("b", destination[:7], 1, 6, th["sub"]),
+                        _logo("logo", 46, 2, th["bg"] or "#000000", th["block"])]
 
 
 def message(theme, line1, line2, bad=False):
