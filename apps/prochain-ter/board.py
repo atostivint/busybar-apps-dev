@@ -180,7 +180,7 @@ def _timer(block, on_block, number, frac):
 def steps(theme, ph, left_s, frac, go_hhmm, dep_hhmm, now=None):
     """The countdown. The block colour says what to do; the ring and the bar drain.
     wait  plain, logo   06:58 / PARTIR A 06:49 (scrolling)   bar: time until you start getting ready
-    prep  yellow, minutes in the ring   PREPARE-TOI POUR PARTIR A 06:49 (scrolling) / MIN
+    prep  yellow, minutes in the ring   MIN / PREPARE-TOI POUR PARTIR A 06:49 (scrolls on the bottom)
     go    green, seconds in the ring    PARTEZ / SEC   red bar: slack left before it is too late
     The prep ring only moves once a minute: a redraw restarts the scrolling text.
     """
@@ -191,8 +191,10 @@ def steps(theme, ph, left_s, frac, go_hhmm, dep_hhmm, now=None):
     if ph == "prep":
         mins = max(1, -(-int(left_s) // 60))
         total = max(mins, round(left_s / max(frac, 1e-6) / 60))
-        return _badge(th, th["prep"], th["on_block"], f"PREPARE-TOI POUR PARTIR A {go_hhmm}", "MIN",
-                      th["prep"], th["sub"], (mins / total, th["prep"]),
+        # the sentence scrolls on the bottom row so the clock keeps the top right corner, and MIN sits
+        # beside the minutes in the ring, on the top row
+        return _badge(th, th["prep"], th["on_block"], "MIN", f"PREPARE-TOI POUR PARTIR A {go_hhmm}",
+                      th["sub"], th["prep"], (mins / total, th["prep"]),
                       left=_timer(th["prep"], th["on_block"], str(mins), mins / total), now=now)
     return _badge(th, th["block"], th["on_block"], dep_hhmm, f"PARTIR A {go_hhmm}", th["fg"], th["sub"],
                   (frac, th["sub"]), now=now)

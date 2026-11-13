@@ -41,10 +41,13 @@ class Board(unittest.TestCase):
                 self.assertTrue("logo" in ids or "n" in ids or "car" in ids)  # the block shows the logo, or a timer
 
     def test_clock_takes_the_free_row(self):
-        wait = {e["id"]: e for e in board.steps("day", "wait", 700, 0.4, "06:49", "06:58", now="06:44")}
+        """The clock never shares a row with a line that reaches into the corner: on PREPARE-TOI the
+        sentence drops to the bottom row so the clock keeps the top right."""
         prep = {e["id"]: e for e in board.steps("day", "prep", 240, 0.8, "06:49", "06:58", now="06:44")}
-        self.assertEqual(wait["now"]["y"], -1)  # the departure time is short: the clock sits beside it
-        self.assertEqual(prep["now"]["y"], 6)  # PREPARE-TOI... fills the top row: the clock drops under it
+        car = {e["id"]: e for e in board.next_train("day", drive={"minutes": 52, "delay_min": 9}, now="06:44")}
+        self.assertEqual(prep["now"]["y"], -1)  # the long sentence sits on the bottom row
+        self.assertTrue(prep["b"]["text"].startswith("PREPARE-TOI"))
+        self.assertEqual(car["now"]["y"], 6)  # VOITURE fills the top row: the clock drops under it
 
     def test_every_screen_carries_the_clock(self):
         for theme in board.THEMES:
