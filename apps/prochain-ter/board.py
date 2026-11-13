@@ -67,11 +67,32 @@ def _base(th):
     return [_rect("bg", 0, 0, 72, 16, th["bg"])] if th["bg"] else []
 
 
-def _badge(th, block, on_block, l1, l2, c1, c2, bar=None, left=None):
+NOW_X, NOW_W, NOW_FIT = 71, 18, 24  # the corner clock: right aligned here, "18:44" is 18 px wide,
+# so a line may reach 26 px (RX..52) before its row is too full for the clock
+
+
+def _w(s):
+    """Rough small-font width in px: a capital or a digit is 4, a space, colon or dash is 2."""
+    return sum(4 if c.isupper() or c.isdigit() else 2 for c in s)
+
+
+def _now(th, hhmm, l1, l2):
+    """The current time, muted, right aligned in the corner of the row that still has room for it (the
+    top row unless its text already reaches the corner), else nothing: no line ever runs under it."""
+    for y, s in ((-1, l1), (6, l2)):
+        if _w(s) <= NOW_FIT:
+            return [_text("now", hhmm, NOW_X, y, th["sub"], align="top_right")]
+    return []
+
+
+def _badge(th, block, on_block, l1, l2, c1, c2, bar=None, left=None, now=None):
     """The one layout: TER logo on a colour block (the colour says what is going on) and two small
-    lines beside it, long text scrolling. bar = (fraction, colour) adds a draining bar underneath."""
+    lines beside it, long text scrolling. bar = (fraction, colour) adds a draining bar underneath.
+    now adds the current time in the free corner (see _now)."""
     els = _base(th) + [_rect("lb", 0, 0, 26, 16, block)] + (left if left else [_logo("logo", 0, 2, block, on_block)])
     els += [_text("a", l1, RX, -1, c1, marquee=True), _text("b", l2, RX, 6, c2, marquee=True)]
+    if now:
+        els += _now(th, now, l1, l2)
     if bar:
         frac, col = bar
         els.append(_rect("track", RX, 14, 44, 2, th["track"]))
@@ -80,20 +101,20 @@ def _badge(th, block, on_block, l1, l2, c1, c2, bar=None, left=None):
     return els
 
 
-def identity(theme, number, destination):
+def identity(theme, number, destination, now=None):
     """The TER logo, train number and destination (shown once when a train comes up)."""
     th = THEMES[theme]
-    return _badge(th, th["block"], th["on_block"], str(number)[:6], destination[:7], th["fg"], th["sub"])
+    return _badge(th, th["block"], th["on_block"], str(number)[:6], destination[:7], th["fg"], th["sub"], now=now)
 
 
-def info(theme, dep, delay_min=0, cancelled=False):
+def info(theme, dep, delay_min=0, cancelled=False, now=None):
     """Departure time and punctuality. Block: plain = on time, yellow = delayed, red = cancelled."""
     th = THEMES[theme]
     if cancelled:
-        return _badge(th, th["bad"], th["on_bad"], dep, "ANNULE", th["fg"], th["bad"])
+        return _badge(th, th["bad"], th["on_bad"], dep, "ANNULE", th["fg"], th["bad"], now=now)
     if delay_min > 0:
-        return _badge(th, th["prep"], th["on_block"], dep, f"+{delay_min} MIN", th["fg"], th["warn"])
-    return _badge(th, th["block"], th["on_block"], dep, "A TEMPS", th["fg"], th["sub"])
+        return _badge(th, th["prep"], th["on_block"], dep, f"+{delay_min} MIN", th["fg"], th["warn"], now=now)
+    return _badge(th, th["block"], th["on_block"], dep, "A TEMPS", th["fg"], th["sub"], now=now)
 
 
 DIGITS = {
@@ -156,7 +177,7 @@ def _timer(block, on_block, number, frac):
     return [_bitmap("n", ["".join(r) for r in grid], {"D": on_block[:7], "T": _mix(block, on_block, 2)})]
 
 
-def steps(theme, ph, left_s, frac, go_hhmm, dep_hhmm):
+def steps(theme, ph, left_s, frac, go_hhmm, dep_hhmm, now=None):
     """The countdown. The block colour says what to do; the ring and the bar drain.
     wait  plain, logo   06:58 / PARTIR A 06:49 (scrolling)   bar: time until you start getting ready
     prep  yellow, minutes in the ring   PREPARE-TOI POUR PARTIR A 06:49 (scrolling) / MIN
@@ -166,15 +187,15 @@ def steps(theme, ph, left_s, frac, go_hhmm, dep_hhmm):
     th = THEMES[theme]
     if ph == "go":
         return _badge(th, th["go"], th["on_block"], "PARTEZ", "SEC", th["go"], th["sub"], (frac, th["bad"]),
-                      left=_timer(th["go"], th["on_block"], str(max(0, int(left_s))), frac))
+                      left=_timer(th["go"], th["on_block"], str(max(0, int(left_s))), frac), now=now)
     if ph == "prep":
         mins = max(1, -(-int(left_s) // 60))
         total = max(mins, round(left_s / max(frac, 1e-6) / 60))
         return _badge(th, th["prep"], th["on_block"], f"PREPARE-TOI POUR PARTIR A {go_hhmm}", "MIN",
                       th["prep"], th["sub"], (mins / total, th["prep"]),
-                      left=_timer(th["prep"], th["on_block"], str(mins), mins / total))
+                      left=_timer(th["prep"], th["on_block"], str(mins), mins / total), now=now)
     return _badge(th, th["block"], th["on_block"], dep_hhmm, f"PARTIR A {go_hhmm}", th["fg"], th["sub"],
-                  (frac, th["sub"]))
+                  (frac, th["sub"]), now=now)
 
 
 # Ford Mondeo estate, side view: traced from a hand-made outline (long roof, upright tailgate),
@@ -187,18 +208,19 @@ CAR = [
 ]
 
 
-def next_train(theme, next_dep=None, next_go=None, drive=None):
+def next_train(theme, next_dep=None, next_go=None, drive=None, now=None):
     """Too late for this train (or nothing left): which train to take next, and when to leave for it.
     With nothing left it shows the car; `drive` ({"minutes", "delay_min"}) adds the live drive time."""
     th = THEMES[theme]
     if next_dep:
-        return _badge(th, th["block"], th["on_block"], next_dep, f"PROCHAIN TER - PARTIR A {next_go}", th["fg"], th["sub"])
+        return _badge(th, th["block"], th["on_block"], next_dep, f"PROCHAIN TER - PARTIR A {next_go}", th["fg"],
+                      th["sub"], now=now)
     car = _shaded("car", CAR, 1, 3, th["block"], th["on_block"])
     if drive:
         jam = drive["delay_min"] >= 5
         return _badge(th, th["block"], th["on_block"], "VOITURE", f"{drive['minutes']} MIN", th["fg"],
-                      th["warn"] if jam else th["sub"], left=[car])
-    return _badge(th, th["block"], th["on_block"], "PLUS DE", "TRAIN", th["fg"], th["fg"], left=[car])
+                      th["warn"] if jam else th["sub"], left=[car], now=now)
+    return _badge(th, th["block"], th["on_block"], "PLUS DE", "TRAIN", th["fg"], th["fg"], left=[car], now=now)
 
 
 def clock(theme, hhmm, dep_hhmm, destination):

@@ -162,27 +162,28 @@ def screens(theme, target, cancelled, missed, now, prep_min, car_min, platform, 
     The TER logo (identity) is shown once when a train comes up (`intro`), then never again.
     At GO the countdown is shown alone, so it cannot be missed."""
     out = []
+    hhmm = f"{now:%H:%M}"  # every screen carries the current time in its free corner
     if cancelled:
-        out.append((CANCEL_S, board.info(theme, f"{cancelled['dep']:%H:%M}", cancelled=True)))
+        out.append((CANCEL_S, board.info(theme, f"{cancelled['dep']:%H:%M}", cancelled=True, now=hhmm)))
     if target is None:
         if missed:
-            out.append((LATE_S, board.next_train(theme, drive=drive)))
+            out.append((LATE_S, board.next_train(theme, drive=drive, now=hhmm)))
         elif not out:
-            out.append((PANEL_S, board.next_train(theme, drive=drive)))
+            out.append((PANEL_S, board.next_train(theme, drive=drive, now=hhmm)))
         return out
     ph, left_s, frac = core.progress(target, now, prep_min, car_min)
     dep = f"{target['real_dep']:%H:%M}"
     go_at = core.times(target, prep_min, car_min)[1]
-    step = board.steps(theme, ph, left_s, frac, f"{go_at:%H:%M}", dep)
+    step = board.steps(theme, ph, left_s, frac, f"{go_at:%H:%M}", dep, now=hhmm)
     if intro and ph != "go":
-        return [(IDENT_S, board.identity(theme, target["number"], dest_name))]
+        return [(IDENT_S, board.identity(theme, target["number"], dest_name, now=hhmm))]
     if ph == "go":
         return [(STEP_S, step)]
     if missed:
-        out.append((LATE_S, board.next_train(theme, dep, f"{go_at:%H:%M}")))
+        out.append((LATE_S, board.next_train(theme, dep, f"{go_at:%H:%M}", now=hhmm)))
     out.append((STEP_S, step))
-    out.append((CLOCK_S, board.clock(theme, f"{now:%H:%M}", dep, dest_name)))
-    out.append((PANEL_S, board.info(theme, dep, target["delay_min"])))
+    out.append((CLOCK_S, board.clock(theme, hhmm, dep, dest_name)))
+    out.append((PANEL_S, board.info(theme, dep, target["delay_min"], now=hhmm)))
     return out
 
 

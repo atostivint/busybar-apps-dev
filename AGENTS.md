@@ -46,8 +46,13 @@ BUSY Bar setup (Windows), 2026-10-31
   (bright) and destination (muted) on the left at `RX` (the exact place the departure time takes on
   every other screen), and the current time alone in the top right corner, muted
   (`_text("now", ..., 71, -1, th["sub"], align="top_right")`). The block and logo stay on the left
-  like everywhere else. The owner asked for the left on 12/11, then for this two-times layout on
-  13/11 — leave it that way unless he says otherwise.
+  like everywhere else.
+- every other screen carries that same muted clock in its free corner (`_badge(..., now=...)` ->
+  `_now()`): top right when its first line stays under ~24 px, else bottom right, so no line ever
+  runs under it; the free-text `message()` screen has no room and gets none. `screens()` in app.py
+  passes `now=hhmm` to all of them.
+- the owner asked for the left on 12/11, for the two-times layout on 13/11, then for the clock on
+  every screen the same day — leave it that way unless he says otherwise.
 
 ## Gotchas
 

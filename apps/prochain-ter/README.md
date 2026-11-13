@@ -10,6 +10,8 @@ time you must start the car, delays/cancellations, and a four-note chiptune chim
   Every screen is the same layout: TER logo on a block whose colour says what is going on
   (plain = fine, yellow = prepare/delay, green = go, red = cancelled/too late), two small lines beside it
   (long text scrolls on the bar itself), and a bar that drains along the bottom for countdowns.
+  The current time rides in whichever corner is free (muted, never the bright line): top right, or
+  bottom right when the top line already reaches the corner.
   The logo + train number shows once when a train comes up, then the rotation:
   1. countdown (9 s): before prepare `06:58 / PARTIR A 06:49`; prepare (yellow) a scrolling
      `PREPARE-TOI POUR PARTIR A 06:49` with the minutes left in the block instead of the logo; go (green)
