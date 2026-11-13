@@ -56,8 +56,8 @@ def _rect(i, x, y, w, h, col):
 RX, RW = 27, 45  # the text area beside the block: x, width (7 small characters)
 
 
-def _text(i, s, x, y, col, font="small", marquee=False):
-    el = {"id": i, "type": "text", "text": s, "font": font, "x": x, "y": y, "align": "top_left", "color": col}
+def _text(i, s, x, y, col, font="small", marquee=False, align="top_left"):
+    el = {"id": i, "type": "text", "text": s, "font": font, "x": x, "y": y, "align": align, "color": col}
     if marquee and len(s) * 6 - 1 > RW:  # the bar scrolls it itself (px per minute), like a station board
         el.update(width=RW, scroll_rate=1800, scroll_start_delay=1000, scroll_repeat_delay=2500)
     return el
@@ -202,11 +202,13 @@ def next_train(theme, next_dep=None, next_go=None, drive=None):
 
 
 def clock(theme, hhmm, destination):
-    """The desk clock: the current time at the very top left, the destination under it, the TER logo
-    on the right (it used to sit in the left block, which pushed the time into the middle)."""
+    """The desk clock: the same badge as every other screen, but the time sits right aligned in the
+    top right corner, where no other screen puts anything (the departure time is always left, at RX),
+    so it reads as the current time and not as the time of departure."""
     th = THEMES[theme]
-    return _base(th) + [_text("a", hhmm, 1, -1, th["fg"]), _text("b", destination[:7], 1, 6, th["sub"]),
-                        _logo("logo", 46, 2, th["bg"] or "#000000", th["block"])]
+    return _base(th) + [_rect("lb", 0, 0, 26, 16, th["block"]), _logo("logo", 0, 2, th["block"], th["on_block"]),
+                        _text("a", hhmm, 71, -1, th["fg"], align="top_right"),
+                        _text("b", destination[:7], 71, 6, th["sub"], align="top_right")]
 
 
 def message(theme, line1, line2, bad=False):

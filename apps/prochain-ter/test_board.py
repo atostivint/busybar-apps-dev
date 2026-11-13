@@ -34,6 +34,16 @@ class Board(unittest.TestCase):
                 ids = [e["id"] for e in els]
                 self.assertTrue("logo" in ids or "n" in ids or "car" in ids)  # the block shows the logo, or a timer
 
+    def test_clock_time_is_top_right(self):
+        """The desk clock keeps the badge layout, but its time is right aligned in the corner: the
+        departure time always sits on the left (RX), so the two can never be read one for the other."""
+        for theme in board.THEMES:
+            els = {e["id"]: e for e in board.clock(theme, "06:44", "RENNES")}
+            self.assertEqual((els["a"]["x"], els["a"]["align"]), (71, "top_right"))
+            self.assertEqual((els["b"]["x"], els["b"]["align"]), (71, "top_right"))
+            self.assertEqual(els["a"]["text"], "06:44")
+            self.assertLess(els["b"]["y"], 16)
+
 
 if __name__ == "__main__":
     unittest.main()
