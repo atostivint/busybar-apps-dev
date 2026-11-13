@@ -181,7 +181,7 @@ def screens(theme, target, cancelled, missed, now, prep_min, car_min, platform, 
     if missed:
         out.append((LATE_S, board.next_train(theme, dep, f"{go_at:%H:%M}")))
     out.append((STEP_S, step))
-    out.append((CLOCK_S, board.clock(theme, f"{now:%H:%M}", dest_name)))
+    out.append((CLOCK_S, board.clock(theme, f"{now:%H:%M}", dep, dest_name)))
     out.append((PANEL_S, board.info(theme, dep, target["delay_min"])))
     return out
 

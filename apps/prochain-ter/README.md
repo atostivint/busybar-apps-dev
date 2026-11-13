@@ -14,7 +14,9 @@ time you must start the car, delays/cancellations, and a four-note chiptune chim
   1. countdown (9 s): before prepare `06:58 / PARTIR A 06:49`; prepare (yellow) a scrolling
      `PREPARE-TOI POUR PARTIR A 06:49` with the minutes left in the block instead of the logo; go (green)
      `PARTEZ` with the seconds left before it gets too tight (`95 SEC`) in the block, red bar. At go this screen stays alone, with a chime.
-  2. clock (4 s)  3. departure time + `A TEMPS` / `+4 MIN` (4 s)
+  2. clock (4 s): the train's departure and destination on the left (where the departure time sits on
+     every other screen), the current time alone in the top right corner.
+  3. departure time + `A TEMPS` / `+4 MIN` (4 s)
   Too late for a train: `07:40 / PROCHAIN TER - PARTIR A 07:31` (scrolling).
   A cancelled train shows first: red logo block, `06:58 / ANNULE`. In the evening there is no prepare step.
 - The screen stays blank (the bar keeps its other apps) until a train is about to matter: `--show-ahead`

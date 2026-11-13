@@ -201,14 +201,16 @@ def next_train(theme, next_dep=None, next_go=None, drive=None):
     return _badge(th, th["block"], th["on_block"], "PLUS DE", "TRAIN", th["fg"], th["fg"], left=[car])
 
 
-def clock(theme, hhmm, destination):
-    """The desk clock: the same badge as every other screen, but the time sits right aligned in the
-    top right corner, where no other screen puts anything (the departure time is always left, at RX),
-    so it reads as the current time and not as the time of departure."""
+def clock(theme, hhmm, dep_hhmm, destination):
+    """The desk clock, one screen for both facts: the train (its departure time in the bright colour and,
+    under it, where it goes, on the left where the departure time sits on every other screen) and the
+    time right now, in the muted colour, alone in the top right corner. Two different places and two
+    different colours, so the current time cannot be read as the departure time."""
     th = THEMES[theme]
     return _base(th) + [_rect("lb", 0, 0, 26, 16, th["block"]), _logo("logo", 0, 2, th["block"], th["on_block"]),
-                        _text("a", hhmm, 71, -1, th["fg"], align="top_right"),
-                        _text("b", destination[:7], 71, 6, th["sub"], align="top_right")]
+                        _text("a", dep_hhmm, RX, -1, th["fg"], marquee=True),
+                        _text("b", destination[:7], RX, 6, th["sub"], marquee=True),
+                        _text("now", hhmm, 71, -1, th["sub"], align="top_right")]
 
 
 def message(theme, line1, line2, bad=False):
