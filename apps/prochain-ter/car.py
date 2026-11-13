@@ -1,9 +1,9 @@
 """The car of the "no more train" screen, as a looping .anim: it drives.
 
-The road dashes slide under it and the body only breathes a little on its suspension (BOB: 0 keeps it
-dead still, which is what the screen ended up wanting), so at a glance the bar says "you have to take
-the car". The firmware plays the frames itself (see anim.py), so the screen still costs one request
-per redraw instead of one per frame.
+The road dashes slide under it, one pixel per frame like the first version (that is the animation the
+owner preferred), and the body only breathes on its suspension: BOB is a fraction of a pixel, so the
+outline shifts by a third of a row rather than jumping. The firmware plays the frames itself (see
+anim.py), so the screen still costs one request per redraw instead of one per frame.
 
 Colours are baked in (one file per theme) and the background is transparent, so the colour block
 behind it shows through, exactly like the still bitmap it replaces.
@@ -14,9 +14,9 @@ import anim
 import board
 
 W, H = 26, 16  # the colour block: the car keeps to its window, like the still bitmap
-FPS, FRAMES = 10, 48  # a 4.8 s loop: 12 px of road (2 dash periods), so the wrap is invisible
-BOB = 0.0  # pixels of suspension travel; 0 = the body stands still and only the road moves
-ROAD_STEP = 4  # frames per pixel of road: 2.5 px/s, a crawl
+FPS, FRAMES = 20, 24  # a 1.2 s loop: 24 px of road (4 dash periods), so the wrap is invisible
+BOB = 0.3  # pixels of suspension travel: the body shifts by a third of a row, no visible jump
+ROAD_STEP = 1  # frames per pixel of road: 20 px/s, the speed the first version had
 CAR_X, CAR_Y = 1, 3  # where board.CAR sits on the block
 ROAD_Y = (14, 15)  # the two rows under the wheels
 DASH = 3  # lit pixels, then as many dark ones
