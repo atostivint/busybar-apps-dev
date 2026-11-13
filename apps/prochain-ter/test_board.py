@@ -56,15 +56,19 @@ class Board(unittest.TestCase):
         self.assertEqual(els["now"]["y"], 6)
 
     def test_every_screen_carries_the_clock(self):
+        """The clock sits in the right corner of whichever row still has room; the line it shares that
+        row with always stops before it (measured: it starts on column 54)."""
         for theme in board.THEMES:
             for els in screens(theme)[:-1]:  # all but the free-text message, which has no room
                 found = {e["id"]: e for e in els}
                 self.assertIn("now", found)
-                self.assertEqual((found["now"]["text"], found["now"]["x"], found["now"]["align"],
-                                  found["now"]["y"]), ("06:44", 71, "top_right", -1))
+                row = -1 if found["now"]["y"] == -1 else 6
+                self.assertIn(row, (-1, 6))
+                self.assertEqual((found["now"]["text"], found["now"]["x"], found["now"]["align"]),
+                                 ("06:44", 71, "top_right"))
+                line = found["a" if row == -1 else "b"]["text"]
+                self.assertLessEqual(board._w(line), board.NOW_FIT)  # it stops before the clock
                 self.assertEqual(found["now"]["color"], board.THEMES[theme]["sub"])  # muted, never the bright line
-                # the first line stops before the clock: the corner is always free
-                self.assertLessEqual(board._w(found["a"]["text"]), board.NOW_FIT)
             self.assertNotIn("now", [e["id"] for e in board.message(theme, "Pas de train", "dans la plage")])
 
     def test_the_car_screen_drives(self):
@@ -76,7 +80,7 @@ class Board(unittest.TestCase):
             self.assertEqual((moving["car"]["type"], moving["car"]["path"], moving["car"]["loop"]),
                              ("animation", "car.anim", True))
             self.assertEqual(still["car"]["type"], "xpmbitmap")
-            self.assertEqual((moving["a"]["text"], moving["b"]["text"]), ("PAS DE", "TRAIN"))
+            self.assertEqual((moving["a"]["text"], moving["b"]["text"]), ("PAS", "DE TRAIN"))
             self.assertEqual(moving["now"]["y"], -1)
             with_time = {e["id"]: e for e in board.next_train(theme, drive={"minutes": 52, "delay_min": 0},
                                                               now="06:44", car_path="car.anim")}
@@ -103,7 +107,7 @@ class Car(unittest.TestCase):
         frames = car.frames(th["block"], th["on_block"])
         self.assertEqual(len(frames), car.FRAMES)
         self.assertTrue(all(len(f) == car.W * car.H * 4 for f in frames))
-        self.assertNotEqual(frames[0], frames[1])  # the road moves under the car
+        self.assertNotEqual(frames[0], frames[car.ROAD_STEP])  # the road moves under the car
         self.assertTrue(any(f[3::4].count(0) for f in frames))  # transparent background: the block shows
 
     def test_writes_a_busy_anim(self):

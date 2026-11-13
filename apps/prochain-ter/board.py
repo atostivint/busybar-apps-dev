@@ -67,13 +67,15 @@ def _base(th):
     return [_rect("bg", 0, 0, 72, 16, th["bg"])] if th["bg"] else []
 
 
-NOW_X, NOW_W, NOW_FIT = 71, 18, 24  # the corner clock: right aligned here, "18:44" is 18 px wide,
-# so a line may reach 26 px (RX..52) before its row is too full for the clock
+NOW_X = 71  # the clock is right aligned here; its first lit pixel lands on 54, so a line may reach 53
+NOW_FIT = 27  # widest line that can still share its row with the clock, with a couple of px of slack
 
 
 def _w(s):
-    """Rough small-font width in px: a capital or a digit is 4, a space, colon or dash is 2."""
-    return sum(4 if c.isupper() or c.isdigit() else 2 for c in s)
+    """Upper bound of a small-font string's width in px. Measured on the bar: capitals about 4.4 px,
+    digits 3.8, a space 3, a colon 2; each is rounded up, so a line this accepts never reaches the
+    clock in the corner."""
+    return sum(5 if c.isupper() else 4 if c.isdigit() else 3 if c == " " else 2 for c in s)
 
 
 def _now(th, hhmm, l1, l2):
@@ -224,7 +226,7 @@ def next_train(theme, next_dep=None, next_go=None, drive=None, now=None, car_pat
         jam = drive["delay_min"] >= 5
         return _badge(th, th["block"], th["on_block"], f"{drive['minutes']} MIN", "EN VOITURE", th["warn"] if jam
                       else th["fg"], th["sub"], left=[car], now=now)
-    return _badge(th, th["block"], th["on_block"], "PAS DE", "TRAIN", th["fg"], th["fg"], left=[car], now=now)
+    return _badge(th, th["block"], th["on_block"], "PAS", "DE TRAIN", th["fg"], th["fg"], left=[car], now=now)
 
 
 def clock(theme, hhmm, dep_hhmm, destination):

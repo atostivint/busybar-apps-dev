@@ -1,8 +1,9 @@
 """The car of the "no more train" screen, as a looping .anim: it drives.
 
-The road dashes slide under it one pixel per frame and the body bobs on its suspension once per
-loop, so at a glance the bar says "you have to take the car". The firmware plays the frames itself
-(see anim.py), so the screen still costs one request per redraw instead of one per frame.
+The road dashes slide under it and the body only breathes a little on its suspension (BOB: 0 keeps it
+dead still, which is what the screen ended up wanting), so at a glance the bar says "you have to take
+the car". The firmware plays the frames itself (see anim.py), so the screen still costs one request
+per redraw instead of one per frame.
 
 Colours are baked in (one file per theme) and the background is transparent, so the colour block
 behind it shows through, exactly like the still bitmap it replaces.
@@ -13,7 +14,9 @@ import anim
 import board
 
 W, H = 26, 16  # the colour block: the car keeps to its window, like the still bitmap
-FPS, FRAMES = 20, 24  # a 1.2 s loop: 24 px of road (4 dash periods) and one bob, so the wrap is invisible
+FPS, FRAMES = 10, 48  # a 4.8 s loop: 12 px of road (2 dash periods), so the wrap is invisible
+BOB = 0.0  # pixels of suspension travel; 0 = the body stands still and only the road moves
+ROAD_STEP = 4  # frames per pixel of road: 2.5 px/s, a crawl
 CAR_X, CAR_Y = 1, 3  # where board.CAR sits on the block
 ROAD_Y = (14, 15)  # the two rows under the wheels
 DASH = 3  # lit pixels, then as many dark ones
@@ -43,7 +46,7 @@ def frames(block, on_block):
     car, ink, road = _coverage(), _rgb(on_block), _rgb(board._mix(block, on_block, 2))
     out = []
     for f in range(FRAMES):
-        bob = 0.5 - 0.5 * math.cos(2 * math.pi * f / FRAMES)  # 0 -> 1 -> 0: one bump per loop
+        bob = BOB * (0.5 - 0.5 * math.cos(2 * math.pi * f / FRAMES))  # 0 -> BOB -> 0: one breath per loop
         alpha = [[0.0] * W for _ in range(H)]
         for y in range(H):
             for x in range(W):
@@ -54,7 +57,7 @@ def frames(block, on_block):
         px = bytearray(W * H * 4)
         for y in ROAD_Y:  # the road first: the car drives over it
             for x in range(W):
-                if ((x + f) // DASH) % 2 == 0:
+                if ((x + f // ROAD_STEP) // DASH) % 2 == 0:
                     _put(px, x, y, road, 255)
         for y in range(H):
             for x in range(W):
