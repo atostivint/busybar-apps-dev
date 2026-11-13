@@ -51,6 +51,12 @@ BUSY Bar setup (Windows), 2026-10-31
   `_now()`): top right when its first line stays under ~24 px, else bottom right, so no line ever
   runs under it; the free-text `message()` screen has no room and gets none. `screens()` in app.py
   passes `now=hhmm` to all of them.
+- the "no more train" screens show a driving car: `car.py` writes a 26x16 `.anim` (the block's size)
+  at startup, `app.py` uploads it like the chime and falls back to the still `_shaded` bitmap if the
+  upload fails. Tuning lives in three constants: `ROAD_STEP` (frames per pixel of road: 1 = 20 px/s,
+  the pace the owner prefers), `BOB` (suspension travel in px: 0.3 = the outline shifts a third of a
+  row, no visible jump; 0 = dead still, which he found too static in the other direction) and
+  `FPS`/`FRAMES` (loop; the road shift must stay a multiple of 6 px so the wrap is invisible).
 - the owner asked for the left on 12/11, for the two-times layout on 13/11, then for the clock on
   every screen the same day — leave it that way unless he says otherwise.
 
