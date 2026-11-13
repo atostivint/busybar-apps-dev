@@ -23,6 +23,31 @@ BUSY Bar setup (Windows), 2026-10-31
   ~20 s while it uploads. App log: `GET /api/_manager/apps/halloween-clock/log`.
 - Sky loops are 300 frames = 15 s, which divides 60 s on purpose (see gotcha 5).
 
+## Where the apps actually run (2026-11-13)
+
+- `prochain-ter` (and `fui-clock`) do not run from the local manager above: they run on the k3s
+  manager, dashboard `https://busybar.homelab.lan` (self-signed certificate, so `curl -k`).
+  Namespace `busybar`, deployment `busybar-manager`; apps live on the `busybar-apps` PVC mounted
+  at `/app/apps/<slug>` in the pod, each with a `.busybar-library.json` stamp naming the repo and
+  commit it was installed from.
+- Deploy = push `master`, refresh the catalog, update that app (config and variation are kept, and
+  the app is restarted if it was running):
+  `curl -k -X POST https://busybar.homelab.lan/api/_manager/library/check -H 'Content-Type: application/json' -d '{}'`
+  then `curl -k -X POST https://busybar.homelab.lan/api/_manager/library/update -H 'Content-Type: application/json' -d '{"slug":"prochain-ter"}'`.
+  (PowerShell: send the JSON from a file with `--data-binary "@body.json"`, inline escaping breaks.)
+- Do not hand-copy files into the pod with `kubectl cp` any more: the stamp keeps pointing at an
+  older commit, and the pod then runs a patch no commit describes. That is how the 12/11 clock
+  patch (47cd896) got to the pod without the stamp following it.
+- Inspect it: `kubectl -n busybar exec deploy/busybar-manager -- sh -c 'grep -n "def clock" -A7 /app/apps/prochain-ter/board.py'`;
+  app log `GET /api/_manager/apps/prochain-ter/log`; screen capture `GET /api/screen?display=0` on
+  the same host (base64 of 72x16 pixels, 3 bytes each, BGR).
+- The bar is the same device for both managers: `barHost` 192.168.59.122 (`token` in the configs).
+- prochain-ter's desk clock: the current time is right aligned in the top right corner
+  (`_text(..., 71, -1, ..., align="top_right")`, destination under it) inside the same badge as
+  every other screen; the departure time stays at `RX` on the left, so the two cannot be taken one
+  for the other. The owner asked for the left on 12/11 and then wanted the right back on 13/11 —
+  leave it right unless he says otherwise.
+
 ## Gotchas
 
 1. `npm run build` fails with `EALLOWSCRIPTS` because `~/.npmrc` has `allow-scripts`;
