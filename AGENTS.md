@@ -42,11 +42,12 @@ BUSY Bar setup (Windows), 2026-10-31
   app log `GET /api/_manager/apps/prochain-ter/log`; screen capture `GET /api/screen?display=0` on
   the same host (base64 of 72x16 pixels, 3 bytes each, BGR).
 - The bar is the same device for both managers: `barHost` 192.168.59.122 (`token` in the configs).
-- prochain-ter's desk clock: the current time is right aligned in the top right corner
-  (`_text(..., 71, -1, ..., align="top_right")`, destination under it) inside the same badge as
-  every other screen; the departure time stays at `RX` on the left, so the two cannot be taken one
-  for the other. The owner asked for the left on 12/11 and then wanted the right back on 13/11 —
-  leave it right unless he says otherwise.
+- prochain-ter's desk clock puts both facts on one screen, far apart: the train's departure time
+  (bright) and destination (muted) on the left at `RX` (the exact place the departure time takes on
+  every other screen), and the current time alone in the top right corner, muted
+  (`_text("now", ..., 71, -1, th["sub"], align="top_right")`). The block and logo stay on the left
+  like everywhere else. The owner asked for the left on 12/11, then for this two-times layout on
+  13/11 — leave it that way unless he says otherwise.
 
 ## Gotchas
 
