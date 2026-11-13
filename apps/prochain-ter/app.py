@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 import board
 import buttons
+import car
 import chime
 import core
 import engine
@@ -150,11 +151,33 @@ def prepare_engine(base, volume):
         return None
 
 
+def prepare_car(base, theme):
+    """Write and upload the driving-car animation (see car.py). -> remote name, or None for the still car."""
+    th = board.THEMES[theme]
+    local = HERE / "cache" / f"car_{theme}.anim"
+    local.parent.mkdir(exist_ok=True)
+    car.write(local, th["block"], th["on_block"])
+    for attempt in range(5):  # 508 = the asset is briefly locked by the display
+        try:
+            chime.upload(base, APP, local, "car.anim")
+            return "car.anim"
+        except urllib.error.HTTPError as e:
+            if e.code not in (408, 508) or attempt == 4:
+                print(f"car animation upload failed, drawing the still car: {e}", file=sys.stderr, flush=True)
+                return None
+            time.sleep(0.5 + attempt)
+        except (urllib.error.URLError, OSError) as e:
+            print(f"car animation upload failed, drawing the still car: {e}", file=sys.stderr, flush=True)
+            return None
+    return None
+
+
 SHORT = {"caulnes": "CAULNES", "la-brohiniere": "BROHIN.", "quedillac": "QUEDIL.", "rennes": "RENNES"}
 PANEL_S, IDENT_S, STEP_S, CANCEL_S, LATE_S, CLOCK_S = 4, 5, 9, 4, 9, 4  # seconds each screen stays up
 
 
-def screens(theme, target, cancelled, missed, now, prep_min, car_min, platform, dest_name, intro=False, drive=None):
+def screens(theme, target, cancelled, missed, now, prep_min, car_min, platform, dest_name, intro=False, drive=None,
+            car_path=None):
     """[(seconds, elements)] to rotate through.
 
     Order: a cancelled train, "too late" for a train you can no longer catch (with the next one to
@@ -167,9 +190,9 @@ def screens(theme, target, cancelled, missed, now, prep_min, car_min, platform, 
         out.append((CANCEL_S, board.info(theme, f"{cancelled['dep']:%H:%M}", cancelled=True, now=hhmm)))
     if target is None:
         if missed:
-            out.append((LATE_S, board.next_train(theme, drive=drive, now=hhmm)))
+            out.append((LATE_S, board.next_train(theme, drive=drive, now=hhmm, car_path=car_path)))
         elif not out:
-            out.append((PANEL_S, board.next_train(theme, drive=drive, now=hhmm)))
+            out.append((PANEL_S, board.next_train(theme, drive=drive, now=hhmm, car_path=car_path)))
         return out
     ph, left_s, frac = core.progress(target, now, prep_min, car_min)
     dep = f"{target['real_dep']:%H:%M}"
@@ -180,7 +203,7 @@ def screens(theme, target, cancelled, missed, now, prep_min, car_min, platform, 
     if ph == "go":
         return [(STEP_S, step)]
     if missed:
-        out.append((LATE_S, board.next_train(theme, dep, f"{go_at:%H:%M}", now=hhmm)))
+        out.append((LATE_S, board.next_train(theme, dep, f"{go_at:%H:%M}", now=hhmm, car_path=car_path)))
     out.append((STEP_S, step))
     out.append((CLOCK_S, board.clock(theme, hhmm, dep, dest_name)))
     out.append((PANEL_S, board.info(theme, dep, target["delay_min"], now=hhmm)))
@@ -229,6 +252,8 @@ def main():
                core.Window("evening", days, core.parse_hhmm(es), core.parse_hhmm(ee), "back")]
     sound = prepare_chime(base, a.chime_volume) if a.chime else None
     engine_sound = prepare_engine(base, a.chime_volume) if (a.chime and a.engine) else None
+    theme = "night" if a.night else "day"
+    car_path = prepare_car(base, theme)  # the driving car of the "no more train" screen
     print(f"{a.station}: prepare {a.prep_min} min, then {car_min} min to the platform (drive {drive})", flush=True)
 
     table, table_day, feed, feed_at = None, None, {}, 0.0
@@ -345,9 +370,9 @@ def main():
             if target and (target["number"], target["date"]) not in intro_seen:
                 intro_seen.add((target["number"], target["date"]))
                 intro_until = time.time() + IDENT_S  # the TER logo, once per train
-            seq = screens("night" if a.night else "day", target, cancelled, missed, now, prep_min, car,
+            seq = screens(theme, target, cancelled, missed, now, prep_min, car,
                           platform, dest_name, intro=time.time() < intro_until,
-                          drive=live.get() if (live and target is None) else None)
+                          drive=live.get() if (live and target is None) else None, car_path=car_path)
             els = pick_screen(seq, time.time())
             led = ALERT_LED if events else None
             if events and sound:

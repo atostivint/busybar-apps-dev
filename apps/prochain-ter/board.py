@@ -210,19 +210,21 @@ CAR = [
 ]
 
 
-def next_train(theme, next_dep=None, next_go=None, drive=None, now=None):
+def next_train(theme, next_dep=None, next_go=None, drive=None, now=None, car_path=None):
     """Too late for this train (or nothing left): which train to take next, and when to leave for it.
-    With nothing left it shows the car; `drive` ({"minutes", "delay_min"}) adds the live drive time."""
+    With nothing left it shows the car, driving when `car_path` is the uploaded animation;
+    `drive` ({"minutes", "delay_min"}) adds the live drive time."""
     th = THEMES[theme]
     if next_dep:
         return _badge(th, th["block"], th["on_block"], next_dep, f"PROCHAIN TER - PARTIR A {next_go}", th["fg"],
                       th["sub"], now=now)
-    car = _shaded("car", CAR, 1, 3, th["block"], th["on_block"])
+    car = ({"id": "car", "type": "animation", "path": car_path, "x": 0, "y": 0, "loop": True} if car_path
+           else _shaded("car", CAR, 1, 3, th["block"], th["on_block"]))
     if drive:
         jam = drive["delay_min"] >= 5
-        return _badge(th, th["block"], th["on_block"], "VOITURE", f"{drive['minutes']} MIN", th["fg"],
-                      th["warn"] if jam else th["sub"], left=[car], now=now)
-    return _badge(th, th["block"], th["on_block"], "PLUS DE", "TRAIN", th["fg"], th["fg"], left=[car], now=now)
+        return _badge(th, th["block"], th["on_block"], f"{drive['minutes']} MIN", "EN VOITURE", th["warn"] if jam
+                      else th["fg"], th["sub"], left=[car], now=now)
+    return _badge(th, th["block"], th["on_block"], "PAS DE", "TRAIN", th["fg"], th["fg"], left=[car], now=now)
 
 
 def clock(theme, hhmm, dep_hhmm, destination):
