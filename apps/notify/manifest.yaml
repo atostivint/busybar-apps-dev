@@ -1,0 +1,6 @@
+name: Notifications
+author: elekt
+description: Mirrors Home Assistant notifications on the front display. Listens on the busybar_notify event over HA's WebSocket API, then shows a small looping animation for the notification kind, its title and message, and the time. Draws nothing at rest, so the bar stays with its other apps.
+tags:
+  - notification
+  - home-assistant
