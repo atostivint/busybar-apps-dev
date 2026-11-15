@@ -95,8 +95,12 @@ Load-bearing details, all learned on this bar (see `CLAUDE.md`):
 
 ## Home Assistant side
 
-Three automations fire the event. The token never appears in any YAML: `event.fire` is called from
+Three automations fire the event. The token never appears in any YAML: the event is fired from
 inside Home Assistant itself.
+
+**`event.fire` is not a service.** Home Assistant's `event` domain exposes none, so
+`action: event.fire` is reported as "unknown action" and stops the automation. The built-in action
+is the bare `event:` key with `event_data:` under it, exactly as in the snippets below.
 
 `source` is the short camera or location the screen prints (about nine characters fit; a longer one
 is cut with `..`). An event without a `source` shows its `title` instead, so a one-off automation can
@@ -105,29 +109,26 @@ keep sending only `kind` + `title`. The `message` is accepted and ignored.
 Doorbell:
 
 ```yaml
-# doorbell (automation.terrasse_ouest_chat_colis_ou_livreur) — after script.canal
-- action: event.fire
-  data:
-    event_type: busybar_notify
-    event_data:
-      kind: "{{ verdict.choice }}"
-      source: "TER OUEST"
-      title: "Terrasse Ouest · {{ verdict.choice }}"
-      message: "{{ verdict.choice }} sur la terrasse ouest · confiance {{ (verdict.confidence * 100) | round(0) }} %"
+# automation.terrasse_ouest_chat_colis_ou_livreur  (after script.canal)
+- event: busybar_notify
+  event_data:
+    kind: "{{ verdict.choice }}"
+    source: "TER OUEST"
+    title: "Terrasse Ouest · {{ verdict.choice }}"
+    message: "{{ verdict.choice }} sur la terrasse ouest · confiance {{ (verdict.confidence * 100) | round(0) }} %"
 ```
 
-Heat-pump automation `automation.alarme_hp_dimplex` — add at the top of `actions` (before the 16h
+Heat-pump automation `automation.alarme_hp_dimplex` — at the top of its `actions` (before the 16h
 delay). The source is short because the title would be cut to `Alarme ..`:
 
 ```yaml
-- action: event.fire
-  data:
-    event_type: busybar_notify
-    event_data:
-      kind: alarme_hp
-      source: "PAC"
-      title: "Alarme PAC"
-      message: "Haute pression détectée"
+# automation.alarme_hp_dimplex  (top of actions, before the 16h delay)
+- event: busybar_notify
+  event_data:
+    kind: alarme_hp
+    source: "PAC"
+    title: "Alarme PAC"
+    message: "Haute pression détectée"
 ```
 
 BC-250 GPU temperature — the three automations already exist (80 / 85 / 90 °C, trigger
@@ -135,39 +136,33 @@ BC-250 GPU temperature — the three automations already exist (80 / 85 / 90 °C
 The `°` is left out on purpose: `C` reads cleanly on the bar, and the source always fits.
 
 ```yaml
-# BC-250 80 (same shape for 85/90)
-- action: event.fire
-  data:
-    event_type: busybar_notify
-    event_data:
-      kind: bc250
-      source: "BC250 {{ states('sensor.bc_250_gpu_temperature') | int }}C"
-      title: "BC-250 — chauffage"
-      message: "GPU {{ states('sensor.bc_250_gpu_temperature') }} C"
+# automation.bc_250_80_degc_chaud  (after script.canal)
+- event: busybar_notify
+  event_data:
+    kind: bc250
+    source: "BC250 {{ states('sensor.bc_250_gpu_temperature') | int }}C"
+    title: "BC-250 — chauffage"
+    message: "GPU {{ states('sensor.bc_250_gpu_temperature') }} C"
 ```
 
 ```yaml
 # automation.bc_250_85_degc_attention  (after script.canal)
-- action: event.fire
-  data:
-    event_type: busybar_notify
-    event_data:
-      kind: bc250
-      source: "BC250 {{ states('sensor.bc_250_gpu_temperature') | int }}C"
-      title: "BC-250 — attention"
-      message: "GPU {{ states('sensor.bc_250_gpu_temperature') }} C"
+- event: busybar_notify
+  event_data:
+    kind: bc250
+    source: "BC250 {{ states('sensor.bc_250_gpu_temperature') | int }}C"
+    title: "BC-250 — attention"
+    message: "GPU {{ states('sensor.bc_250_gpu_temperature') }} C"
 ```
 
 ```yaml
 # automation.bc_250_90_degc_critique  (after script.canal)
-- action: event.fire
-  data:
-    event_type: busybar_notify
-    event_data:
-      kind: bc250
-      source: "BC250 {{ states('sensor.bc_250_gpu_temperature') | int }}C"
-      title: "BC-250 — critique"
-      message: "GPU {{ states('sensor.bc_250_gpu_temperature') }} C"
+- event: busybar_notify
+  event_data:
+    kind: bc250
+    source: "BC250 {{ states('sensor.bc_250_gpu_temperature') | int }}C"
+    title: "BC-250 — critique"
+    message: "GPU {{ states('sensor.bc_250_gpu_temperature') }} C"
 ```
 
 `kind` is matched case- and space-insensitively (`_` and `-` count as spaces), and one leading

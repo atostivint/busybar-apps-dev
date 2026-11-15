@@ -7,7 +7,7 @@
 At rest it draws nothing, so the bar belongs to its other apps. When Home Assistant fires the
 `busybar_notify` event it takes the screen for --hold seconds: the animation for the kind, the
 title, the message, the current time in a free corner, and the orange notification LED. The bar's
-snooze button dismisses it. See the README for the HA side (`action: event.fire`).
+snooze button dismisses it. See the README for the HA side (the `event: busybar_notify` action with `event_data`).
 
 The manager starts apps with --host 127.0.0.1:8321 and forwards draws to the bar; it overrides the
 draw priority with the variation's, which must be ~90 (above prochain-ter 85 and the bar's clock 80).

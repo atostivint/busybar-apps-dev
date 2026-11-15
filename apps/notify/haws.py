@@ -1,7 +1,7 @@
 """Home Assistant events over its WebSocket API, in standard-library Python only.
 
-HA pushes the custom event `busybar_notify`; an automation fires it with
-`action: event.fire` (see the README). This module keeps that subscription open in a background
+HA pushes the custom event `busybar_notify`; an automation fires it with the `event: busybar_notify`
+action and its `event_data` (see the README). This module keeps that subscription open in a background
 thread: it authenticates with a long-lived token, subscribes, then hands every event's payload to
 `on_event(data)` as {"kind", "title", "message"}. It pings the socket every ~20 s, and reconnects
 with a doubling backoff on anything that goes wrong (socket error, HA restart, token refused).
